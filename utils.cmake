@@ -24,7 +24,7 @@ function(target_activate_cpp14 TARGET)
     endif("${CMAKE_VERSION}" VERSION_GREATER "3.1")
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         target_compile_options(${TARGET} PUBLIC -stdlib=libc++)
-        target_link_libraries(${TARGET} PUBLIC c++abi)
+        target_link_libraries(${TARGET} PUBLIC c++)
     endif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endfunction(target_activate_cpp14)
 
