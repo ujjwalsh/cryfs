@@ -19,6 +19,7 @@ addons:
       - ubuntu-toolchain-r-test
     packages:
     - clang-3.7
+    - libc++-dev
     - libcrypto++-dev
     - libfuse-dev
 install:
