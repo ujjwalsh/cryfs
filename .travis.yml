@@ -44,16 +44,16 @@ install:
 - sudo cp -a /dev/urandom /dev/random
 script:
 - cmake .. -DBUILD_TESTING=on -DCMAKE_BUILD_TYPE=Debug
-- make -j$NUMCORES
-- ./test/gitversion/gitversion-test
-- ./test/cpp-utils/cpp-utils-test
+- make -j$NUMCORES fspp-test
+#- ./test/gitversion/gitversion-test
+#- ./test/cpp-utils/cpp-utils-test
 # TODO Also run on osx once fixed
-- if [ "${TRAVIS_OS_NAME}" == "linux" ]; then ./run_with_fuse.sh ./test/fspp/fspp-test || exit 1; fi
-- ./test/parallelaccessstore/parallelaccessstore-test
-- ./test/blockstore/blockstore-test
-- ./test/blobstore/blobstore-test
+- if [ "${TRAVIS_OS_NAME}" == "linux" ]; then ./test/fspp/fspp-test || exit 1; fi
+#- ./test/parallelaccessstore/parallelaccessstore-test
+#- ./test/blockstore/blockstore-test
+#- ./test/blobstore/blobstore-test
 # TODO Also run on osx once fixed
-- if [ "${TRAVIS_OS_NAME}" == "linux" ]; then ./test/cryfs/cryfs-test || exit 1; fi
-- if [ "${TRAVIS_OS_NAME}" == "linux" ]; then ./test/cryfs-cli/cryfs-cli-test || exit 1; fi
+#- if [ "${TRAVIS_OS_NAME}" == "linux" ]; then ./test/cryfs/cryfs-test || exit 1; fi
+#- if [ "${TRAVIS_OS_NAME}" == "linux" ]; then ./test/cryfs-cli/cryfs-cli-test || exit 1; fi
 after_script:
 - rm run_with_fuse.sh
