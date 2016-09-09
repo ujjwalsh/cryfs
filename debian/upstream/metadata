@@ -1,5 +1,6 @@
 Name: CryFS
 Bug-Database: https://github.com/cryfs/cryfs/issues
 FAQ: https://www.cryfs.org/howitworks
+Changelog: https://raw.githubusercontent.com/cryfs/cryfs/master/ChangeLog.txt
 Repository: https://github.com/cryfs/cryfs.git -b master
 Repository-Browse: https://github.com/cryfs/cryfs
