@@ -1,0 +1,28 @@
+Source: cryfs
+Section: utils
+Priority: optional
+Maintainer: David Steele <steele@debian.org>
+Build-Depends: debhelper (>= 9),
+               cmake,
+               libcurl4-openssl-dev,
+               libboost-filesystem-dev,
+               libboost-system-dev,
+               libboost-chrono-dev,
+               libboost-program-options-dev,
+               libboost-thread-dev,
+               libcrypto++-dev,
+               libssl-dev,
+               libfuse-dev,
+               python-all (>= 2.7),
+               ruby-ronn,
+Standards-Version: 3.9.8
+Homepage: https://www.cryfs.org/
+Vcs-Git: https://github.com/davesteele/cryfs.git -b debian
+Vcs-Browser: https://github.com/davesteele/cryfs
+
+Package: cryfs
+Architecture: amd64
+Depends: fuse, libcrypto++6, libcurl3 (>= 7.16.2), libfuse2 (>= 2.8), libgcc1 (>= 1:3.0), libstdc++6 (>= 6), ${misc:Depends}, ${shlibs:Depends}
+Description: encrypt your files and store them in the cloud
+ CryFS encrypts your files, so you can safely store them anywhere. It works
+ well together with cloud services like Dropbox, iCloud, OneDrive and others.

@@ -1,0 +1,5 @@
+cryfs (0.9.5-1) experimental; urgency=medium
+
+  * Initial release. (Closes: #837127)
+
+ -- David Steele <steele@debian.org>  Thu, 08 Sep 2016 14:23:42 -0400
