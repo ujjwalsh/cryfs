@@ -1,4 +1,11 @@
-cryfs (0.9.5-1) experimental; urgency=medium
+cryfs (0.9.5-2) experimental; urgency=medium
+
+  * Update copyright file.
+  * Initial release. (Closes: #837127)
+
+ -- David Steele <steele@debian.org>  Mon, 12 Sep 2016 18:48:10 -0400
+
+cryfs (0.9.5-1) UNRELEASED; urgency=medium
 
   * Initial release. (Closes: #837127)
 
