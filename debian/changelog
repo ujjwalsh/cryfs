@@ -1,4 +1,11 @@
-cryfs (0.9.5-2) experimental; urgency=medium
+cryfs (0.9.5-3) unstable; urgency=low
+
+  * Changes to support arch any.
+  * Initial release. (Closes: #837127)
+
+ -- David Steele <steele@debian.org>  Wed, 14 Sep 2016 10:29:30 -0400
+
+cryfs (0.9.5-2) UNRELEASED; urgency=medium
 
   * Update copyright file.
   * Initial release. (Closes: #837127)
