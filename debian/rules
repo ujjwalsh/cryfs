@@ -19,6 +19,7 @@ DT = $(shell date -d "${CHDATE}" "+%Y-%m-%d")
 
 override_dh_auto_build:
 	dh_auto_build
+	cp obj*/src/cryfs-cli/cryfs .
 	ronn --date=${DT} debian/*.ronn
 
 .PHONY get-orig-source:

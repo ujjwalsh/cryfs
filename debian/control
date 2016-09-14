@@ -21,7 +21,7 @@ Vcs-Git: https://github.com/davesteele/cryfs.git -b debian
 Homepage: https://www.cryfs.org/
 
 Package: cryfs
-Architecture: amd64
+Architecture: any
 Depends: fuse,
          libcrypto++6,
          libcurl3,
