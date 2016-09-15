@@ -1,6 +1,7 @@
 cryfs (0.9.5-3) unstable; urgency=low
 
   * Changes to support arch any.
+  * Found another copyright to log.
   * Initial release. (Closes: #837127)
 
  -- David Steele <steele@debian.org>  Wed, 14 Sep 2016 10:29:30 -0400

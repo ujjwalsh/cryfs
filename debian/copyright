@@ -26,6 +26,10 @@ Files: debian/*
 Copyright: 2016, David Steele <steele@debian.org>
 License: LGPL-3
 
+Files: src/cpp-utils/io/pipestream.h
+Copyright: 2013 Dietmar Kuehl http://www.dietmar-kuehl.de
+License: Expat
+
 License: BSD-2-clause
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are
