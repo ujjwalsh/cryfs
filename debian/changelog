@@ -1,4 +1,11 @@
-cryfs (0.9.5-3) unstable; urgency=low
+cryfs (0.9.5-4) unstable; urgency=low
+
+  * Initial release. (Closes: #837127)
+  * More copyright detail
+
+ -- David Steele <steele@debian.org>  Fri, 16 Sep 2016 20:13:34 -0400
+
+cryfs (0.9.5-3) URELEASED; urgency=low
 
   * Changes to support arch any.
   * Found another copyright to log.
