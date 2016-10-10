@@ -1,3 +1,9 @@
+cryfs (0.9.5-5) unstable; urgency=medium
+
+  * Support libcrypto++ 5.6.4.
+
+ -- David Steele <steele@debian.org>  Sun, 09 Oct 2016 22:46:06 -0400
+
 cryfs (0.9.5-4) unstable; urgency=low
 
   * Initial release. (Closes: #837127)
