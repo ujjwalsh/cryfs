@@ -1,6 +1,7 @@
 cryfs (0.9.6-1) UNRELEASED; urgency=medium
 
   * New upstream version.
+  * Compile with the remote update check disabled
 
  -- David Steele <steele@debian.org>  Sat, 15 Oct 2016 16:22:34 -0400
 
