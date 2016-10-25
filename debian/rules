@@ -9,11 +9,19 @@ VER ?= $(shell (dpkg-parsechangelog -l$(PKD)/changelog | grep Version | sed 's/V
 
 %:
 	dh $@ --parallel
-
+	#CC=/usr/bin/clang CXX=/usr/bin/clang++ dh $@ --parallel
 
 override_dh_auto_configure:
-	dh_auto_configure -- -DCMAKE_BUILD_TYPE=Release -DBoost_USE_STATIC_LIBs=off \
-                             -DCRYFS_UPDATE_CHECKS=off
+	export CC=/usr/bin/clang
+	export CXX=/usr/bin/clang++
+	#dh_auto_configure -- -DCMAKE_BUILD_TYPE=Release \
+	dh_auto_configure -- -DCMAKE_BUILD_TYPE=Release \
+	                     -DBoost_USE_STATIC_LIBs=off \
+                             -DCRYFS_UPDATE_CHECKS=off \
+			     -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+#                             -DCMAKE_INSTALL_PREFIX=\usr \
+#			     -DCMAKE_CXX_FLAGS="-I/usr/include -pedantic -v"
+
 
 CHDATE = $(shell grep "\-\-" debian/changelog | head -1 | sed 's/.\+, //' | sed 's/...\:.\+//' )
 DT = $(shell date -d "${CHDATE}" "+%Y-%m-%d")

@@ -22,13 +22,9 @@ function(target_activate_cpp14 TARGET)
             endif()
         endif(COMPILER_HAS_CPP14_SUPPORT)
     endif("${CMAKE_VERSION}" VERSION_GREATER "3.1")
-    # Ideally, we'd like to use libc++ on linux as well, but:
-    #    - http://stackoverflow.com/questions/37096062/get-a-basic-c-program-to-compile-using-clang-on-ubuntu-16
-    #    - https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=808086
-    # so only use it on Apple systems...
-    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND APPLE)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         target_compile_options(${TARGET} PUBLIC -stdlib=libc++)
-    endif(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND APPLE)
+    endif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endfunction(target_activate_cpp14)
 
 #################################################
