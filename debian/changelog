@@ -1,3 +1,9 @@
+cryfs (0.9.7-1) UNRELEASED; urgency=medium
+
+  * New upstream version.
+
+ -- David Steele <steele@debian.org>  Mon, 17 Apr 2017 23:03:51 -0400
+
 cryfs (0.9.6-1) unstable; urgency=medium
 
   * New upstream version.
