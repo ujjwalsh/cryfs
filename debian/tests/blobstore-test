@@ -1,0 +1,5 @@
+#!/bin/bash
+
+set -e
+
+./obj*/test/blobstore/blobstore-test

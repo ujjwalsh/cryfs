@@ -13,7 +13,7 @@ VER ?= $(shell (dpkg-parsechangelog -l$(PKD)/changelog | grep Version | sed 's/V
 
 override_dh_auto_configure:
 	dh_auto_configure -- -DCMAKE_BUILD_TYPE=Release -DBoost_USE_STATIC_LIBs=off \
-                             -DCRYFS_UPDATE_CHECKS=off
+                             -DCRYFS_UPDATE_CHECKS=off -DBUILD_TESTING=True
 
 CHDATE = $(shell grep "\-\-" debian/changelog | head -1 | sed 's/.\+, //' | sed 's/...\:.\+//' )
 DT = $(shell date -d "${CHDATE}" "+%Y-%m-%d")

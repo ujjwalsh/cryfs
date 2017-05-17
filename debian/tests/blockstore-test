@@ -1,0 +1,7 @@
+#!/bin/bash
+
+set -e
+
+# This test tests failure cases. block stderr, to keep autopkgtest
+# from logging the failure
+./obj*/test/blockstore/blockstore-test 2>&1

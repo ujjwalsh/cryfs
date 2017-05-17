@@ -16,6 +16,7 @@ Build-Depends: debhelper (>= 9),
                python-all,
                ruby-ronn
 Standards-Version: 3.9.8
+Testsuite: autopkgtest
 Vcs-Browser: https://github.com/davesteele/cryfs
 Vcs-Git: https://github.com/davesteele/cryfs.git -b debian
 Homepage: https://www.cryfs.org/
