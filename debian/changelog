@@ -2,6 +2,7 @@ cryfs (0.9.7-1) UNRELEASED; urgency=medium
 
   * New upstream version.
   * Build tests by default, and add CI testing
+  * Compiles with gcc7 (Closes: 853360).
 
  -- David Steele <steele@debian.org>  Mon, 17 Apr 2017 23:03:51 -0400
 
