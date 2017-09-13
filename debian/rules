@@ -27,4 +27,4 @@ override_dh_auto_build:
 get-orig-source:  $(info I: $(PKG)_$(VER))
 	@echo "# Downloading..."
 	uscan --noconf --verbose --rename --destdir=$(CURDIR) --check-dirname-level=0 --force-download --download-version $(VER) $(PK)
-	rm -f $(PKG)-$(VER).tar.gz.pgp
+	mv $(PKG)-$(VER).tar.gz.pgp $(PKG)_$(VER).orig.tar.gz.asc
