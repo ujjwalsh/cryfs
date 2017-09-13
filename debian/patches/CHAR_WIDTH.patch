@@ -1,0 +1,54 @@
+From abbefd71666055daac9e14e78262620f9e845850 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Wed, 19 Oct 2016 06:52:55 -0700
+Subject: [PATCH] CHAR_WIDTH -> CHAR_SIZE to avoid collision with ISO/IEC TS
+ 18661-1:2014 macro
+Bug-Debian: https://bugs.debian.org/875640
+Applied-Upstream: https://github.com/cryfs/cryfs/commit/f1c6fa0
+
+---
+ fmt/format.h | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/fmt/format.h b/fmt/format.h
+index ae7bd493..de1475bc 100644
+--- a/vendor/spdlog/spdlog/fmt/bundled/format.h
++++ b/vendor/spdlog/spdlog/fmt/bundled/format.h
+@@ -2233,29 +2233,29 @@
+         typedef typename BasicWriter<Char>::CharPtr CharPtr;
+         Char fill = internal::CharTraits<Char>::cast(spec_.fill());
+         CharPtr out = CharPtr();
+-        const unsigned CHAR_WIDTH = 1;
+-        if (spec_.width_ > CHAR_WIDTH)
++        const unsigned CHAR_SIZE = 1;
++        if (spec_.width_ > CHAR_SIZE)
+         {
+             out = writer_.grow_buffer(spec_.width_);
+             if (spec_.align_ == ALIGN_RIGHT)
+             {
+-                std::uninitialized_fill_n(out, spec_.width_ - CHAR_WIDTH, fill);
+-                out += spec_.width_ - CHAR_WIDTH;
++                std::uninitialized_fill_n(out, spec_.width_ - CHAR_SIZE, fill);
++                out += spec_.width_ - CHAR_SIZE;
+             }
+             else if (spec_.align_ == ALIGN_CENTER)
+             {
+                 out = writer_.fill_padding(out, spec_.width_,
+-                                           internal::const_check(CHAR_WIDTH), fill);
++                                           internal::const_check(CHAR_SIZE), fill);
+             }
+             else
+             {
+-                std::uninitialized_fill_n(out + CHAR_WIDTH,
+-                                          spec_.width_ - CHAR_WIDTH, fill);
++                std::uninitialized_fill_n(out + CHAR_SIZE,
++                                          spec_.width_ - CHAR_SIZE, fill);
+             }
+         }
+         else
+         {
+-            out = writer_.grow_buffer(CHAR_WIDTH);
++            out = writer_.grow_buffer(CHAR_SIZE);
+         }
+         *out = internal::CharTraits<Char>::cast(value);
+     }
