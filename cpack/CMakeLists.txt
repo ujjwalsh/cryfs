@@ -39,11 +39,13 @@ if(BUILDTYPE MATCHES RELEASE AND NOT BUILD_TESTING)
         set(CPACK_PACKAGE_EXECUTABLES "cryfs" "CryFS")
         set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
         set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
-        # Needs gnupg2 for postinst script
-        set(CPACK_DEBIAN_PACKAGE_DEPENDS "fuse, gnupg2")
+        # Needs gnupg2, lsb-release for postinst script
+        set(CPACK_DEBIAN_PACKAGE_DEPENDS "fuse, gnupg2, lsb-release")
 
         set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://www.cryfs.org")
         set(CPACK_RPM_PACKAGE_LICENSE "LGPLv3")
+        set(CPACK_RPM_PACKAGE_DESCRIPTION ${CPACK_PACKAGE_DESCRIPTION})
+        set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION "/usr/bin;/usr/share/man;/usr/share/man/man1")
         set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA "${CMAKE_CURRENT_SOURCE_DIR}/debfiles/postinst;${CMAKE_CURRENT_SOURCE_DIR}/debfiles/postrm")
 
         include(CPack)
