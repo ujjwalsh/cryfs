@@ -1,3 +1,9 @@
+cryfs (0.9.8-1) UNRELEASED; urgency=medium
+
+  * New upstream version.
+
+ -- David Steele <steele@debian.org>  Tue, 16 Jan 2018 11:38:55 -0500
+
 cryfs (0.9.7-2) unstable; urgency=medium
 
   * Fix FTBFS due to macro overload in spdlog (Closes: #875640).
