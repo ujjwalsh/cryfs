@@ -14,7 +14,6 @@ Build-Depends: debhelper (>= 9),
                libssl-dev,
                libfuse-dev,
                python-all,
-               ruby-ronn
 Standards-Version: 3.9.8
 Testsuite: autopkgtest
 Vcs-Browser: https://github.com/davesteele/cryfs
