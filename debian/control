@@ -14,8 +14,7 @@ Build-Depends: debhelper (>= 9),
                libssl-dev,
                libfuse-dev,
                python-all,
-Standards-Version: 3.9.8
-Testsuite: autopkgtest
+Standards-Version: 4.1.2
 Vcs-Browser: https://github.com/davesteele/cryfs
 Vcs-Git: https://github.com/davesteele/cryfs.git -b debian
 Homepage: https://www.cryfs.org/
