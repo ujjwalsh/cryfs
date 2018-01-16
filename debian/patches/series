@@ -1,4 +1,2 @@
 build-test
 disable-mars-test
-CHAR_WIDTH.patch
-freebsd
