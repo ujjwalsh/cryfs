@@ -1,3 +1,9 @@
+cryfs (0.9.9-1) unstable; urgency=medium
+
+  *  New upstream version.
+
+ -- David Steele <steele@debian.org>  Wed, 07 Feb 2018 20:54:27 -0500
+
 cryfs (0.9.8-1) unstable; urgency=medium
 
   * New upstream version.
