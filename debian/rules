@@ -8,7 +8,7 @@ VER ?= $(shell (dpkg-parsechangelog -l$(PKD)/changelog | grep Version | sed 's/V
 
 
 %:
-	dh $@ --parallel
+	dh $@
 
 
 override_dh_auto_configure:
