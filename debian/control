@@ -22,11 +22,6 @@ Homepage: https://www.cryfs.org/
 Package: cryfs
 Architecture: any
 Depends: fuse,
-         libcrypto++6,
-         libcurl3,
-         libfuse2,
-         libgcc1,
-         libstdc++6 (>= 6),
          ${misc:Depends},
          ${shlibs:Depends}
 Description: encrypt your files and store them in the cloud
