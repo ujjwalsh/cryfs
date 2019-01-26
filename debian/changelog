@@ -1,3 +1,9 @@
+cryfs (0.9.10-2) unstable; urgency=medium
+
+  * Avoid gcc segfault by skipping mipsel test build.
+
+ -- David Steele <steele@debian.org>  Fri, 25 Jan 2019 20:22:13 -0500
+
 cryfs (0.9.10-1) unstable; urgency=medium
 
   * New upstream version.
