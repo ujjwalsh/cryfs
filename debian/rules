@@ -7,7 +7,7 @@ ARCH := $(shell uname -m)
 
 
 override_dh_auto_configure:
-	if [ "$(ARCH)" = "mipsel" ] ; then \
+	if [ "$(ARCH)" = "mips" ] ; then \
 	    dh_auto_configure -- -DCMAKE_BUILD_TYPE=Release -DBoost_USE_STATIC_LIBs=off \
                              -DCRYFS_UPDATE_CHECKS=off -DBUILD_TESTING=False; \
 	else \
