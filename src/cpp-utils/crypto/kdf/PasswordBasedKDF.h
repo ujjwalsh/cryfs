@@ -2,28 +2,23 @@
 #ifndef MESSMER_CPPUTILS_CRYPTO_KDF_PASSWORDBASEDKDF_H
 #define MESSMER_CPPUTILS_CRYPTO_KDF_PASSWORDBASEDKDF_H
 
-#include "../../data/FixedSizeData.h"
+#include "../../crypto/symmetric/EncryptionKey.h"
 #include "../../data/Data.h"
 
 namespace cpputils {
 
     class PasswordBasedKDF {
     public:
-        virtual ~PasswordBasedKDF() {}
+        virtual ~PasswordBasedKDF() = default;
 
-        template<size_t KEYSIZE> FixedSizeData<KEYSIZE> deriveKey(const std::string &password);
-        virtual const Data &kdfParameters() const = 0;
+        struct KeyResult final {
+          cpputils::EncryptionKey key;
+          cpputils::Data kdfParameters;
+        };
 
-    protected:
-        virtual void derive(void *destination, size_t size, const std::string &password) = 0;
+        virtual EncryptionKey deriveExistingKey(size_t keySize, const std::string& password, const Data& kdfParameters) = 0;
+        virtual KeyResult deriveNewKey(size_t keySize, const std::string& password) = 0;
     };
-
-    template<size_t KEYSIZE> FixedSizeData<KEYSIZE>
-    inline PasswordBasedKDF::deriveKey(const std::string &password) {
-        auto result = FixedSizeData<KEYSIZE>::Null();
-        derive(result.data(), result.BINARY_LENGTH, password);
-        return result;
-    }
 
 }
 

@@ -5,18 +5,17 @@
 #include "../fs_interface/Dir.h"
 #include "../fs_interface/Symlink.h"
 
-#include "../fuse/FuseErrnoException.h"
+#include "../fs_interface/FuseErrnoException.h"
 #include "../fs_interface/File.h"
 #include "../fs_interface/Node.h"
 
 #include <cpp-utils/logging/logging.h>
 #include <cpp-utils/pointer/unique_ref.h>
+#include <cpp-utils/system/stat.h>
 #include <sstream>
 
 using namespace fspp;
-using cpputils::dynamic_pointer_move;
 using cpputils::unique_ref;
-using cpputils::make_unique_ref;
 using std::vector;
 using std::string;
 using boost::none;
@@ -33,7 +32,7 @@ using namespace cpputils::logging;
 #define PROFILE(name)
 #endif
 
-FilesystemImpl::FilesystemImpl(Device *device)
+FilesystemImpl::FilesystemImpl(cpputils::unique_ref<Device> device)
   :
 #ifdef FSPP_PROFILE
    _loadFileNanosec(0), _loadDirNanosec(0), _loadSymlinkNanosec(0), _openFileNanosec(0), _flushNanosec(0),
@@ -45,7 +44,7 @@ FilesystemImpl::FilesystemImpl(Device *device)
    _utimensNanosec(0), _statfsNanosec(0), _createSymlinkNanosec(0), _createSymlinkNanosec_withoutLoading(0),
    _readSymlinkNanosec(0), _readSymlinkNanosec_withoutLoading(0),
 #endif
-   _device(device), _open_files()
+   _device(std::move(device)), _open_files()
 {
 }
 
@@ -126,7 +125,7 @@ int FilesystemImpl::openFile(const bf::path &path, int flags) {
 
 int FilesystemImpl::openFile(File *file, int flags) {
   PROFILE(_openFileNanosec);
-  return _open_files.open(file->open(flags));
+  return _open_files.open(file->open(fspp::openflags_t(flags)));
 }
 
 void FilesystemImpl::flush(int descriptor) {
@@ -139,57 +138,73 @@ void FilesystemImpl::closeFile(int descriptor) {
   _open_files.close(descriptor);
 }
 
-void FilesystemImpl::lstat(const bf::path &path, struct ::stat *stbuf) {
+namespace {
+void convert_stat_info_(const fspp::Node::stat_info& input, fspp::fuse::STAT *output) {
+    output->st_nlink = input.nlink;
+    output->st_mode = input.mode.value();
+    output->st_uid = input.uid.value();
+    output->st_gid = input.gid.value();
+    output->st_size = input.size.value();
+    output->st_blocks = input.blocks;
+    output->st_atim = input.atime;
+    output->st_mtim = input.mtime;
+    output->st_ctim = input.ctime;
+}
+}
+
+void FilesystemImpl::lstat(const bf::path &path, fspp::fuse::STAT *stbuf) {
   PROFILE(_lstatNanosec);
   auto node = _device->Load(path);
   if(node == none) {
     throw fuse::FuseErrnoException(ENOENT);
   } else {
-    (*node)->stat(stbuf);
+    auto stat_info = (*node)->stat();
+    convert_stat_info_(stat_info, stbuf);
   }
 }
 
-void FilesystemImpl::fstat(int descriptor, struct ::stat *stbuf) {
+void FilesystemImpl::fstat(int descriptor, fspp::fuse::STAT *stbuf) {
   PROFILE(_fstatNanosec);
-  _open_files.get(descriptor)->stat(stbuf);
+  auto stat_info = _open_files.get(descriptor)->stat();
+  convert_stat_info_(stat_info, stbuf);
 }
 
-void FilesystemImpl::chmod(const boost::filesystem::path &path, mode_t mode) {
+void FilesystemImpl::chmod(const boost::filesystem::path &path, ::mode_t mode) {
   PROFILE(_chmodNanosec);
   auto node = _device->Load(path);
   if(node == none) {
     throw fuse::FuseErrnoException(ENOENT);
   } else {
-    (*node)->chmod(mode);
+    (*node)->chmod(fspp::mode_t(mode));
   }
 }
 
-void FilesystemImpl::chown(const boost::filesystem::path &path, uid_t uid, gid_t gid) {
+void FilesystemImpl::chown(const boost::filesystem::path &path, ::uid_t uid, ::gid_t gid) {
   PROFILE(_chownNanosec);
   auto node = _device->Load(path);
   if(node == none) {
     throw fuse::FuseErrnoException(ENOENT);
   } else {
-    (*node)->chown(uid, gid);
+    (*node)->chown(fspp::uid_t(uid), fspp::gid_t(gid));
   }
 }
 
-void FilesystemImpl::truncate(const bf::path &path, off_t size) {
+void FilesystemImpl::truncate(const bf::path &path, fspp::num_bytes_t size) {
   PROFILE(_truncateNanosec);
   LoadFile(path)->truncate(size);
 }
 
-void FilesystemImpl::ftruncate(int descriptor, off_t size) {
+void FilesystemImpl::ftruncate(int descriptor, fspp::num_bytes_t size) {
   PROFILE(_ftruncateNanosec);
   _open_files.get(descriptor)->truncate(size);
 }
 
-size_t FilesystemImpl::read(int descriptor, void *buf, size_t count, off_t offset) {
+fspp::num_bytes_t FilesystemImpl::read(int descriptor, void *buf, fspp::num_bytes_t count, fspp::num_bytes_t offset) {
   PROFILE(_readNanosec);
   return _open_files.get(descriptor)->read(buf, count, offset);
 }
 
-void FilesystemImpl::write(int descriptor, const void *buf, size_t count, off_t offset) {
+void FilesystemImpl::write(int descriptor, const void *buf, fspp::num_bytes_t count, fspp::num_bytes_t offset) {
   PROFILE(_writeNanosec);
   _open_files.get(descriptor)->write(buf, count, offset);
 }
@@ -214,19 +229,19 @@ void FilesystemImpl::access(const bf::path &path, int mask) {
   }
 }
 
-int FilesystemImpl::createAndOpenFile(const bf::path &path, mode_t mode, uid_t uid, gid_t gid) {
+int FilesystemImpl::createAndOpenFile(const bf::path &path, ::mode_t mode, ::uid_t uid, ::gid_t gid) {
   PROFILE(_createAndOpenFileNanosec);
   auto dir = LoadDir(path.parent_path());
   PROFILE(_createAndOpenFileNanosec_withoutLoading);
-  auto file = dir->createAndOpenFile(path.filename().native(), mode, uid, gid);
+  auto file = dir->createAndOpenFile(path.filename().string(), fspp::mode_t(mode), fspp::uid_t(uid), fspp::gid_t(gid));
   return _open_files.open(std::move(file));
 }
 
-void FilesystemImpl::mkdir(const bf::path &path, mode_t mode, uid_t uid, gid_t gid) {
+void FilesystemImpl::mkdir(const bf::path &path, ::mode_t mode, ::uid_t uid, ::gid_t gid) {
   PROFILE(_mkdirNanosec);
   auto dir = LoadDir(path.parent_path());
   PROFILE(_mkdirNanosec_withoutLoading);
-  dir->createDir(path.filename().native(), mode, uid, gid);
+  dir->createDir(path.filename().string(), fspp::mode_t(mode), fspp::uid_t(uid), fspp::gid_t(gid));
 }
 
 void FilesystemImpl::rmdir(const bf::path &path) {
@@ -278,22 +293,34 @@ void FilesystemImpl::utimens(const bf::path &path, timespec lastAccessTime, time
   }
 }
 
-void FilesystemImpl::statfs(const bf::path &path, struct statvfs *fsstat) {
+void FilesystemImpl::statfs(struct ::statvfs *fsstat) {
   PROFILE(_statfsNanosec);
-  _device->statfs(path, fsstat);
+  Device::statvfs stat = _device->statfs();
+
+  fsstat->f_bsize = stat.blocksize;
+  fsstat->f_blocks = stat.num_total_blocks;
+  fsstat->f_bfree = stat.num_free_blocks;
+  fsstat->f_bavail = stat.num_available_blocks;
+  fsstat->f_files = stat.num_total_inodes;
+  fsstat->f_ffree = stat.num_free_inodes;
+  fsstat->f_favail = stat.num_available_inodes;
+  fsstat->f_namemax = stat.max_filename_length;
+
+  //f_frsize, f_favail, f_fsid and f_flag are ignored in fuse, see http://fuse.sourcearchive.com/documentation/2.7.0/structfuse__operations_4e765e29122e7b6b533dc99849a52655.html#4e765e29122e7b6b533dc99849a52655
+  fsstat->f_frsize = fsstat->f_bsize; // even though this is supposed to be ignored, osxfuse needs it.
 }
 
-void FilesystemImpl::createSymlink(const bf::path &to, const bf::path &from, uid_t uid, gid_t gid) {
+void FilesystemImpl::createSymlink(const bf::path &to, const bf::path &from, ::uid_t uid, ::gid_t gid) {
   PROFILE(_createSymlinkNanosec);
   auto parent = LoadDir(from.parent_path());
   PROFILE(_createSymlinkNanosec_withoutLoading);
-  parent->createSymlink(from.filename().native(), to, uid, gid);
+  parent->createSymlink(from.filename().string(), to, fspp::uid_t(uid), fspp::gid_t(gid));
 }
 
-void FilesystemImpl::readSymlink(const bf::path &path, char *buf, size_t size) {
+void FilesystemImpl::readSymlink(const bf::path &path, char *buf, fspp::num_bytes_t size) {
   PROFILE(_readSymlinkNanosec);
-  string target = LoadSymlink(path)->target().native();
+  string target = LoadSymlink(path)->target().string();
   PROFILE(_readSymlinkNanosec_withoutLoading);
-  std::memcpy(buf, target.c_str(), std::min(target.size()+1, size));
-  buf[size-1] = '\0';
+  std::memcpy(buf, target.c_str(), std::min(static_cast<int64_t>(target.size()+1), size.value()));
+  buf[size.value()-1] = '\0';
 }

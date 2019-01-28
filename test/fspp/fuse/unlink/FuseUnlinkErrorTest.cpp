@@ -1,7 +1,6 @@
 #include "testutils/FuseUnlinkTest.h"
-#include "fspp/fuse/FuseErrnoException.h"
+#include "fspp/fs_interface/FuseErrnoException.h"
 
-using ::testing::_;
 using ::testing::StrEq;
 using ::testing::Throw;
 using ::testing::WithParamInterface;
@@ -15,7 +14,7 @@ INSTANTIATE_TEST_CASE_P(FuseUnlinkErrorTest, FuseUnlinkErrorTest, Values(EACCES,
 
 TEST_P(FuseUnlinkErrorTest, ReturnedErrorIsCorrect) {
   ReturnIsFileOnLstat(FILENAME);
-  EXPECT_CALL(fsimpl, unlink(StrEq(FILENAME)))
+  EXPECT_CALL(*fsimpl, unlink(StrEq(FILENAME)))
     .Times(1).WillOnce(Throw(FuseErrnoException(GetParam())));
 
   int error = UnlinkReturnError(FILENAME);

@@ -2,7 +2,6 @@
 #ifndef MESSMER_FSPP_FSTEST_FSPPFILETEST_H_
 #define MESSMER_FSPP_FSTEST_FSPPFILETEST_H_
 
-#include <sys/fcntl.h>
 #include <sys/stat.h>
 
 #include "testutils/FileTest.h"
@@ -13,76 +12,77 @@ template<class ConcreteFileSystemTestFixture>
 class FsppFileTest: public FileTest<ConcreteFileSystemTestFixture> {
 public:
   void Test_Open_RDONLY(fspp::File *file) {
-    file->open(O_RDONLY);
+    file->open(fspp::openflags_t::RDONLY());
   }
 
   void Test_Open_WRONLY(fspp::File *file) {
-    file->open(O_WRONLY);
+    file->open(fspp::openflags_t::WRONLY());
   }
 
   void Test_Open_RDWR(fspp::File *file) {
-    file->open(O_RDONLY);
+    file->open(fspp::openflags_t::RDONLY());
   }
 
   void Test_Truncate_DontChange1(fspp::File *file, fspp::Node *node) {
-	file->truncate(0);
-	this->EXPECT_SIZE(0, file, node);
+	file->truncate(fspp::num_bytes_t(0));
+	this->EXPECT_SIZE(fspp::num_bytes_t(0), file, node);
   }
 
   void Test_Truncate_GrowTo1(fspp::File *file, fspp::Node *node) {
-	file->truncate(1);
-	this->EXPECT_SIZE(1, file, node);
+	file->truncate(fspp::num_bytes_t(1));
+	this->EXPECT_SIZE(fspp::num_bytes_t(1), file, node);
   }
 
   void Test_Truncate_Grow(fspp::File *file, fspp::Node *node) {
-	file->truncate(10*1024*1024);
-	this->EXPECT_SIZE(10*1024*1024, file, node);
+	file->truncate(fspp::num_bytes_t(10*1024*1024));
+	this->EXPECT_SIZE(fspp::num_bytes_t(10*1024*1024), file, node);
   }
 
   void Test_Truncate_DontChange2(fspp::File *file, fspp::Node *node) {
-	file->truncate(10*1024*1024);
-	file->truncate(10*1024*1024);
-	this->EXPECT_SIZE(10*1024*1024, file, node);
+	file->truncate(fspp::num_bytes_t(10*1024*1024));
+	file->truncate(fspp::num_bytes_t(10*1024*1024));
+	this->EXPECT_SIZE(fspp::num_bytes_t(10*1024*1024), file, node);
   }
 
   void Test_Truncate_Shrink(fspp::File *file, fspp::Node *node) {
-    file->truncate(10*1024*1024);
-    file->truncate(5*1024*1024);
-    this->EXPECT_SIZE(5*1024*1024, file, node);
+    file->truncate(fspp::num_bytes_t(10*1024*1024));
+    file->truncate(fspp::num_bytes_t(5*1024*1024));
+    this->EXPECT_SIZE(fspp::num_bytes_t(5*1024*1024), file, node);
   }
 
   void Test_Truncate_ShrinkTo0(fspp::File *file, fspp::Node *node) {
-	file->truncate(10*1024*1024);
-	file->truncate(0);
-	this->EXPECT_SIZE(0, file, node);
+	file->truncate(fspp::num_bytes_t(10*1024*1024));
+	file->truncate(fspp::num_bytes_t(0));
+	this->EXPECT_SIZE(fspp::num_bytes_t(0), file, node);
   }
 
   void Test_Chown_Uid(fspp::File *file, fspp::Node *node) {
-    node->chown(100, 200);
-    this->IN_STAT(file, node, [] (struct stat st){
-        EXPECT_EQ(100u, st.st_uid);
+    node->chown(fspp::uid_t(100), fspp::gid_t(200));
+    this->IN_STAT(file, node, [] (const fspp::Node::stat_info& st){
+        EXPECT_EQ(fspp::uid_t(100u), st.uid);
     });
   }
 
   void Test_Chown_Gid(fspp::File *file, fspp::Node *node) {
-    node->chown(100, 200);
-    this->IN_STAT(file, node, [] (struct stat st){
-        EXPECT_EQ(200u, st.st_gid);
+    node->chown(fspp::uid_t(100), fspp::gid_t(200));
+    this->IN_STAT(file, node, [] (const fspp::Node::stat_info& st){
+        EXPECT_EQ(fspp::gid_t(200u), st.gid);
     });
   }
 
   void Test_Chmod(fspp::File *file, fspp::Node *node) {
-    node->chmod(S_IFREG | S_IRUSR | S_IWOTH);
-    this->IN_STAT(file, node, [] (struct stat st){
-        EXPECT_EQ((mode_t)(S_IFREG | S_IRUSR | S_IWOTH), st.st_mode);
+    constexpr auto mode = fspp::mode_t().addFileFlag().addUserReadFlag().addOtherWriteFlag();
+    node->chmod(mode);
+    this->IN_STAT(file, node, [mode] (const fspp::Node::stat_info& st){
+        EXPECT_EQ(mode, st.mode);
     });
   }
 
   void Test_Utimens(fspp::File *file, fspp::Node *node) {
-    struct timespec ATIME; ATIME.tv_sec = 1458086400; ATIME.tv_nsec = 34525;
-    struct timespec MTIME; MTIME.tv_sec = 1458086300; MTIME.tv_nsec = 48293;
+    struct timespec ATIME{}; ATIME.tv_sec = 1458086400; ATIME.tv_nsec = 34525;
+    struct timespec MTIME{}; MTIME.tv_sec = 1458086300; MTIME.tv_nsec = 48293;
     node->utimens(ATIME, MTIME);
-    this->IN_STAT(file, node, [this, ATIME, MTIME] (struct stat st) {
+    this->IN_STAT(file, node, [this, ATIME, MTIME] (const fspp::Node::stat_info& st) {
         this->EXPECT_ATIME_EQ(ATIME, st);
         this->EXPECT_MTIME_EQ(MTIME, st);
     });
@@ -195,6 +195,25 @@ TYPED_TEST_P(FsppFileTest, Utimens_Nested) {
     this->Test_Utimens(this->file_nested.get(), this->file_nested_node.get());
 }
 
+TYPED_TEST_P(FsppFileTest, Remove) {
+    this->CreateFile("/mytestfile");
+    EXPECT_NE(boost::none, this->device->Load("/mytestfile"));
+    EXPECT_NE(boost::none, this->device->LoadFile("/mytestfile"));
+    this->Load("/mytestfile")->remove();
+    EXPECT_EQ(boost::none, this->device->Load("/mytestfile"));
+    EXPECT_EQ(boost::none, this->device->LoadFile("/mytestfile"));
+}
+
+TYPED_TEST_P(FsppFileTest, Remove_Nested) {
+    this->CreateDir("/mytestdir");
+    this->CreateFile("/mytestdir/myfile");
+    EXPECT_NE(boost::none, this->device->Load("/mytestdir/myfile"));
+    EXPECT_NE(boost::none, this->device->LoadFile("/mytestdir/myfile"));
+    this->Load("/mytestdir/myfile")->remove();
+    EXPECT_EQ(boost::none, this->device->Load("/mytestdir/myfile"));
+    EXPECT_EQ(boost::none, this->device->LoadFile("/mytestdir/myfile"));
+}
+
 REGISTER_TYPED_TEST_CASE_P(FsppFileTest,
   Open_RDONLY,
   Open_RDONLY_Nested,
@@ -221,7 +240,9 @@ REGISTER_TYPED_TEST_CASE_P(FsppFileTest,
   Chmod,
   Chmod_Nested,
   Utimens,
-  Utimens_Nested
+  Utimens_Nested,
+  Remove,
+  Remove_Nested
 );
 
 //TODO access

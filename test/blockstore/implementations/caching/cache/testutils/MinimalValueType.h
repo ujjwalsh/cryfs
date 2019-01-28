@@ -5,21 +5,22 @@
 #include <cpp-utils/macros.h>
 #include <cassert>
 #include <cpp-utils/assert/assert.h>
+#include <atomic>
 
 // This is a not-default-constructible non-copyable but moveable Value type
 class MinimalValueType {
 public:
-  static int instances;
+  static std::atomic<int> instances;
 
   static MinimalValueType create(int value) {
     return MinimalValueType(value);
   }
 
-  MinimalValueType(MinimalValueType &&rhs): MinimalValueType(rhs.value()) {
+  MinimalValueType(MinimalValueType &&rhs) noexcept: MinimalValueType(rhs.value()) {
     rhs._isMoved = true;
   }
 
-  MinimalValueType &operator=(MinimalValueType &&rhs) {
+  MinimalValueType &operator=(MinimalValueType &&rhs) noexcept {
     _value = rhs.value();
     _isMoved = false;
     rhs._isMoved = true;

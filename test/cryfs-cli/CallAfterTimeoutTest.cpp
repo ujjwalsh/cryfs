@@ -1,22 +1,24 @@
 #include <gtest/gtest.h>
 #include <cpp-utils/pointer/unique_ref.h>
 #include <cryfs-cli/CallAfterTimeout.h>
+#include <atomic>
 
 using cpputils::unique_ref;
 using cpputils::make_unique_ref;
 using boost::chrono::milliseconds;
 using boost::chrono::minutes;
-using boost::chrono::duration_cast;
 using boost::this_thread::sleep_for;
-using namespace cryfs;
+using namespace cryfs_cli;
 
 class CallAfterTimeoutTest : public ::testing::Test {
 public:
+    CallAfterTimeoutTest(): called(false) {}
+
     unique_ref<CallAfterTimeout> callAfterTimeout(milliseconds timeout) {
-        return make_unique_ref<CallAfterTimeout>(timeout, [this] {called = true;});
+        return make_unique_ref<CallAfterTimeout>(timeout, [this] {called = true;}, "test");
     }
 
-    bool called = false;
+    std::atomic<bool> called;
 };
 
 TEST_F(CallAfterTimeoutTest, NoReset_1) {
@@ -59,13 +61,13 @@ TEST_F(CallAfterTimeoutTest, OneReset) {
 }
 
 TEST_F(CallAfterTimeoutTest, TwoResets) {
-    auto obj = callAfterTimeout(milliseconds(100));
-    sleep_for(milliseconds(50));
+    auto obj = callAfterTimeout(milliseconds(200));
+    sleep_for(milliseconds(100));
     obj->resetTimer();
-    sleep_for(milliseconds(75));
+    sleep_for(milliseconds(125));
     obj->resetTimer();
-    sleep_for(milliseconds(75));
+    sleep_for(milliseconds(125));
     EXPECT_FALSE(called);
-    sleep_for(milliseconds(75));
+    sleep_for(milliseconds(125));
     EXPECT_TRUE(called);
 }

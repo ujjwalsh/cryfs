@@ -2,7 +2,7 @@
 #include <cassert>
 
 //TODO Remove and replace with exception hierarchy
-#include <fspp/fuse/FuseErrnoException.h>
+#include <fspp/fs_interface/FuseErrnoException.h>
 
 #include <blobstore/implementations/onblocks/utils/Math.h>
 #include <cpp-utils/data/Data.h>
@@ -13,11 +13,9 @@
 
 using std::vector;
 using std::string;
-using std::pair;
-using std::make_pair;
 
 using blobstore::Blob;
-using blockstore::Key;
+using blockstore::BlockId;
 using cpputils::Data;
 using cpputils::unique_ref;
 using cpputils::make_unique_ref;
@@ -26,10 +24,10 @@ using boost::none;
 namespace cryfs {
 namespace fsblobstore {
 
-constexpr off_t DirBlob::DIR_LSTAT_SIZE;
+constexpr fspp::num_bytes_t DirBlob::DIR_LSTAT_SIZE;
 
-DirBlob::DirBlob(FsBlobStore *fsBlobStore, unique_ref<Blob> blob, std::function<off_t (const blockstore::Key&)> getLstatSize) :
-    FsBlob(std::move(blob)), _fsBlobStore(fsBlobStore), _getLstatSize(getLstatSize), _getLstatSizeMutex(), _entries(), _entriesAndChangedMutex(), _changed(false) {
+DirBlob::DirBlob(unique_ref<Blob> blob, std::function<fspp::num_bytes_t (const blockstore::BlockId&)> getLstatSize) :
+    FsBlob(std::move(blob)), _getLstatSize(getLstatSize), _getLstatSizeMutex(), _entries(), _entriesAndChangedMutex(), _changed(false) {
   ASSERT(baseBlob().blobType() == FsBlobView::BlobType::DIR, "Loaded blob is not a directory");
   _readEntriesFromBlob();
 }
@@ -45,9 +43,9 @@ void DirBlob::flush() {
   baseBlob().flush();
 }
 
-unique_ref<DirBlob> DirBlob::InitializeEmptyDir(FsBlobStore *fsBlobStore, unique_ref<Blob> blob, std::function<off_t(const blockstore::Key&)> getLstatSize) {
-  InitializeBlob(blob.get(), FsBlobView::BlobType::DIR);
-  return make_unique_ref<DirBlob>(fsBlobStore, std::move(blob), getLstatSize);
+unique_ref<DirBlob> DirBlob::InitializeEmptyDir(unique_ref<Blob> blob, const blockstore::BlockId &parent, std::function<fspp::num_bytes_t(const blockstore::BlockId&)> getLstatSize) {
+  InitializeBlob(blob.get(), FsBlobView::BlobType::DIR, parent);
+  return make_unique_ref<DirBlob>(std::move(blob), getLstatSize);
 }
 
 void DirBlob::_writeEntriesToBlob() {
@@ -65,38 +63,42 @@ void DirBlob::_readEntriesFromBlob() {
   _entries.deserializeFrom(static_cast<uint8_t*>(data.data()), data.size());
 }
 
-void DirBlob::AddChildDir(const std::string &name, const Key &blobKey, mode_t mode, uid_t uid, gid_t gid, timespec lastAccessTime, timespec lastModificationTime) {
+void DirBlob::AddChildDir(const std::string &name, const BlockId &blobId, fspp::mode_t mode, fspp::uid_t uid, fspp::gid_t gid, timespec lastAccessTime, timespec lastModificationTime) {
   std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
-  _addChild(name, blobKey, fspp::Dir::EntryType::DIR, mode, uid, gid, lastAccessTime, lastModificationTime);
+  _addChild(name, blobId, fspp::Dir::EntryType::DIR, mode, uid, gid, lastAccessTime, lastModificationTime);
 }
 
-void DirBlob::AddChildFile(const std::string &name, const Key &blobKey, mode_t mode, uid_t uid, gid_t gid, timespec lastAccessTime, timespec lastModificationTime) {
+void DirBlob::AddChildFile(const std::string &name, const BlockId &blobId, fspp::mode_t mode, fspp::uid_t uid, fspp::gid_t gid, timespec lastAccessTime, timespec lastModificationTime) {
   std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
-  _addChild(name, blobKey, fspp::Dir::EntryType::FILE, mode, uid, gid, lastAccessTime, lastModificationTime);
+  _addChild(name, blobId, fspp::Dir::EntryType::FILE, mode, uid, gid, lastAccessTime, lastModificationTime);
 }
 
-void DirBlob::AddChildSymlink(const std::string &name, const blockstore::Key &blobKey, uid_t uid, gid_t gid, timespec lastAccessTime, timespec lastModificationTime) {
+void DirBlob::AddChildSymlink(const std::string &name, const blockstore::BlockId &blobId, fspp::uid_t uid, fspp::gid_t gid, timespec lastAccessTime, timespec lastModificationTime) {
   std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
-  _addChild(name, blobKey, fspp::Dir::EntryType::SYMLINK, S_IFLNK | S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH | S_IWOTH | S_IXOTH, uid, gid, lastAccessTime, lastModificationTime);
+  auto mode = fspp::mode_t().addSymlinkFlag()
+          .addUserReadFlag().addUserWriteFlag().addUserExecFlag()
+          .addGroupReadFlag().addGroupWriteFlag().addGroupExecFlag()
+          .addOtherReadFlag().addOtherWriteFlag().addOtherExecFlag();
+  _addChild(name, blobId, fspp::Dir::EntryType::SYMLINK, mode, uid, gid, lastAccessTime, lastModificationTime);
 }
 
-void DirBlob::_addChild(const std::string &name, const Key &blobKey,
-    fspp::Dir::EntryType entryType, mode_t mode, uid_t uid, gid_t gid, timespec lastAccessTime, timespec lastModificationTime) {
-  _entries.add(name, blobKey, entryType, mode, uid, gid, lastAccessTime, lastModificationTime);
+void DirBlob::_addChild(const std::string &name, const BlockId &blobId,
+    fspp::Dir::EntryType entryType, fspp::mode_t mode, fspp::uid_t uid, fspp::gid_t gid, timespec lastAccessTime, timespec lastModificationTime) {
+  _entries.add(name, blobId, entryType, mode, uid, gid, lastAccessTime, lastModificationTime);
   _changed = true;
 }
 
-void DirBlob::AddOrOverwriteChild(const std::string &name, const Key &blobKey, fspp::Dir::EntryType entryType,
-                                  mode_t mode, uid_t uid, gid_t gid, timespec lastAccessTime, timespec lastModificationTime,
-                                  std::function<void (const blockstore::Key &key)> onOverwritten) {
+void DirBlob::AddOrOverwriteChild(const std::string &name, const BlockId &blobId, fspp::Dir::EntryType entryType,
+                                  fspp::mode_t mode, fspp::uid_t uid, fspp::gid_t gid, timespec lastAccessTime, timespec lastModificationTime,
+                                  std::function<void (const blockstore::BlockId &blockId)> onOverwritten) {
   std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
-  _entries.addOrOverwrite(name, blobKey, entryType, mode, uid, gid, lastAccessTime, lastModificationTime, onOverwritten);
+  _entries.addOrOverwrite(name, blobId, entryType, mode, uid, gid, lastAccessTime, lastModificationTime, onOverwritten);
   _changed = true;
 }
 
-void DirBlob::RenameChild(const blockstore::Key &key, const std::string &newName, std::function<void (const blockstore::Key &key)> onOverwritten) {
+void DirBlob::RenameChild(const blockstore::BlockId &blockId, const std::string &newName, std::function<void (const blockstore::BlockId &blockId)> onOverwritten) {
   std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
-  _entries.rename(key, newName, onOverwritten);
+  _entries.rename(blockId, newName, onOverwritten);
   _changed = true;
 }
 
@@ -105,9 +107,9 @@ boost::optional<const DirEntry&> DirBlob::GetChild(const string &name) const {
   return _entries.get(name);
 }
 
-boost::optional<const DirEntry&> DirBlob::GetChild(const Key &key) const {
+boost::optional<const DirEntry&> DirBlob::GetChild(const BlockId &blockId) const {
   std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
-  return _entries.get(key);
+  return _entries.get(blockId);
 }
 
 void DirBlob::RemoveChild(const string &name) {
@@ -116,9 +118,9 @@ void DirBlob::RemoveChild(const string &name) {
   _changed = true;
 }
 
-void DirBlob::RemoveChild(const Key &key) {
+void DirBlob::RemoveChild(const BlockId &blockId) {
   std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
-  _entries.remove(key);
+  _entries.remove(blockId);
   _changed = true;
 }
 
@@ -130,11 +132,11 @@ void DirBlob::AppendChildrenTo(vector<fspp::Dir::Entry> *result) const {
   }
 }
 
-off_t DirBlob::lstat_size() const {
+fspp::num_bytes_t DirBlob::lstat_size() const {
   return DIR_LSTAT_SIZE;
 }
 
-void DirBlob::statChild(const Key &key, struct ::stat *result) const {
+fspp::Node::stat_info DirBlob::statChild(const BlockId &blockId) const {
   std::unique_lock<std::mutex> lock(_getLstatSizeMutex);
   auto lstatSizeGetter = _getLstatSize;
 
@@ -145,63 +147,67 @@ void DirBlob::statChild(const Key &key, struct ::stat *result) const {
   // lstatSizeGetter can call ParallelAccessFsBlobStore::load().
   lock.unlock();
 
-  result->st_size = lstatSizeGetter(key);
-  statChildWithSizeAlreadySet(key, result);
+  auto lstatSize = lstatSizeGetter(blockId);
+  return statChildWithKnownSize(blockId, lstatSize);
 }
 
-void DirBlob::statChildWithSizeAlreadySet(const Key &key, struct ::stat *result) const {
-  auto childOpt = GetChild(key);
+fspp::Node::stat_info DirBlob::statChildWithKnownSize(const BlockId &blockId, fspp::num_bytes_t size) const {
+  fspp::Node::stat_info result;
+
+  auto childOpt = GetChild(blockId);
   if (childOpt == boost::none) {
     throw fspp::fuse::FuseErrnoException(ENOENT);
   }
   const auto &child = *childOpt;
-  result->st_mode = child.mode();
-  result->st_uid = child.uid();
-  result->st_gid = child.gid();
+  result.mode = child.mode();
+  result.uid = child.uid();
+  result.gid = child.gid();
   //TODO If possible without performance loss, then for a directory, st_nlink should return number of dir entries (including "." and "..")
-  result->st_nlink = 1;
-  result->st_atim = child.lastAccessTime();
-  result->st_mtim = child.lastModificationTime();
-  result->st_ctim = child.lastMetadataChangeTime();
+  result.nlink = 1;
+  result.size = size;
+  result.atime = child.lastAccessTime();
+  result.mtime = child.lastModificationTime();
+  result.ctime = child.lastMetadataChangeTime();
   //TODO Move ceilDivision to general utils which can be used by cryfs as well
-  result->st_blocks = blobstore::onblocks::utils::ceilDivision(result->st_size, (off_t)512);
-  result->st_blksize = _fsBlobStore->virtualBlocksizeBytes();
+  result.blocks = blobstore::onblocks::utils::ceilDivision(size.value(), static_cast<int64_t>(512));
+  return result;
 }
 
-void DirBlob::updateAccessTimestampForChild(const Key &key) {
+void DirBlob::updateAccessTimestampForChild(const BlockId &blockId, TimestampUpdateBehavior timestampUpdateBehavior) {
   std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
-  _entries.updateAccessTimestampForChild(key);
-  _changed = true;
-}
-
-void DirBlob::updateModificationTimestampForChild(const Key &key) {
-  std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
-  _entries.updateModificationTimestampForChild(key);
-  _changed = true;
-}
-
-void DirBlob::chmodChild(const Key &key, mode_t mode) {
-  std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
-  _entries.setMode(key, mode);
-  _changed = true;
-}
-
-void DirBlob::chownChild(const Key &key, uid_t uid, gid_t gid) {
-  std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
-  if(_entries.setUidGid(key, uid, gid)) {
+  if (_entries.updateAccessTimestampForChild(blockId, timestampUpdateBehavior)) {
     _changed = true;
   }
 }
 
-void DirBlob::utimensChild(const Key &key, timespec lastAccessTime, timespec lastModificationTime) {
+void DirBlob::updateModificationTimestampForChild(const BlockId &blockId) {
   std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
-  _entries.setAccessTimes(key, lastAccessTime, lastModificationTime);
+  _entries.updateModificationTimestampForChild(blockId);
   _changed = true;
 }
 
-void DirBlob::setLstatSizeGetter(std::function<off_t(const blockstore::Key&)> getLstatSize) {
-    std::unique_lock<std::mutex> lock(_getLstatSizeMutex);
-    _getLstatSize = getLstatSize;
+void DirBlob::chmodChild(const BlockId &blockId, fspp::mode_t mode) {
+  std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
+  _entries.setMode(blockId, mode);
+  _changed = true;
+}
+
+void DirBlob::chownChild(const BlockId &blockId, fspp::uid_t uid, fspp::gid_t gid) {
+  std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
+  if(_entries.setUidGid(blockId, uid, gid)) {
+    _changed = true;
+  }
+}
+
+void DirBlob::utimensChild(const BlockId &blockId, timespec lastAccessTime, timespec lastModificationTime) {
+  std::unique_lock<std::mutex> lock(_entriesAndChangedMutex);
+  _entries.setAccessTimes(blockId, lastAccessTime, lastModificationTime);
+  _changed = true;
+}
+
+void DirBlob::setLstatSizeGetter(std::function<fspp::num_bytes_t(const blockstore::BlockId&)> getLstatSize) {
+    std::lock_guard<std::mutex> lock(_getLstatSizeMutex);
+    _getLstatSize = std::move(getLstatSize);
 }
 
 cpputils::unique_ref<blobstore::Blob> DirBlob::releaseBaseBlob() {

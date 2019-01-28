@@ -1,15 +1,12 @@
 #include "testutils/FuseWriteTest.h"
 
-#include "fspp/fuse/FuseErrnoException.h"
+#include "fspp/fs_interface/FuseErrnoException.h"
 
 using ::testing::_;
-using ::testing::StrEq;
 using ::testing::WithParamInterface;
 using ::testing::Values;
 using ::testing::Eq;
 using ::testing::Return;
-using ::testing::Invoke;
-using ::testing::Throw;
 
 using namespace fspp::fuse;
 
@@ -21,9 +18,9 @@ INSTANTIATE_TEST_CASE_P(FuseWriteFileDescriptorTest, FuseWriteFileDescriptorTest
 TEST_P(FuseWriteFileDescriptorTest, FileDescriptorIsCorrect) {
   ReturnIsFileOnLstat(FILENAME);
   OnOpenReturnFileDescriptor(FILENAME, GetParam());
-  EXPECT_CALL(fsimpl, write(Eq(GetParam()), _, _, _))
+  EXPECT_CALL(*fsimpl, write(Eq(GetParam()), _, _, _))
     .Times(1).WillOnce(Return());
 
   char buf[1];
-  WriteFile(FILENAME, buf, 1, 0);
+  WriteFile(FILENAME, buf, fspp::num_bytes_t(1), fspp::num_bytes_t(0));
 }

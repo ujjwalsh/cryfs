@@ -6,7 +6,6 @@ using ::testing::Eq;
 using ::testing::WithParamInterface;
 using ::testing::Values;
 using ::testing::Return;
-using ::testing::AtLeast;
 
 using std::string;
 
@@ -28,8 +27,8 @@ INSTANTIATE_TEST_CASE_P(FuseFlushFileDescriptorTest, FuseFlushFileDescriptorTest
 TEST_P(FuseFlushFileDescriptorTest, FlushOnCloseFile) {
   ReturnIsFileOnLstat(FILENAME);
 
-  EXPECT_CALL(fsimpl, openFile(StrEq(FILENAME), _)).WillOnce(Return(GetParam()));
-  EXPECT_CALL(fsimpl, flush(Eq(GetParam()))).Times(1);
+  EXPECT_CALL(*fsimpl, openFile(StrEq(FILENAME), _)).WillOnce(Return(GetParam()));
+  EXPECT_CALL(*fsimpl, flush(Eq(GetParam()))).Times(1);
 
   OpenAndCloseFile(FILENAME);
 }

@@ -8,19 +8,15 @@
 using boost::optional;
 using boost::none;
 using std::string;
-using std::shared_ptr;
-using std::make_shared;
 using cpputils::HttpClient;
-using cpputils::CurlHttpClient;
 using boost::property_tree::ptree;
 using boost::property_tree::json_parser_error;
 using namespace cpputils::logging;
 
-namespace cryfs {
+namespace cryfs_cli {
 
-    VersionChecker::VersionChecker(shared_ptr<HttpClient> httpClient)
-            : _versionInfo(_getVersionInfo(std::move(httpClient))) {
-    }
+    VersionChecker::VersionChecker(HttpClient* httpClient)
+            : _versionInfo(_getVersionInfo(httpClient)) {}
 
     optional<string> VersionChecker::newestVersion() const {
         if (_versionInfo == none) {
@@ -49,13 +45,17 @@ namespace cryfs {
         return none;
     }
 
-    optional<ptree> VersionChecker::_getVersionInfo(shared_ptr<HttpClient> httpClient) {
+    optional<ptree> VersionChecker::_getVersionInfo(HttpClient* httpClient) {
         long timeoutMsec = 2000;
-        optional<string> response = httpClient->get("https://www.cryfs.org/version_info.json", timeoutMsec);
-        if (response == none) {
-            return none;
-        }
-        return _parseJson(*response);
+		string response;
+		try {
+			response = httpClient->get("https://www.cryfs.org/version_info.json", timeoutMsec);
+		}
+		catch (const std::exception& e) {
+			LOG(WARN, "HTTP Error: {}", e.what());
+			return none;
+		}
+        return _parseJson(response);
     }
 
     optional<ptree> VersionChecker::_parseJson(const string &json) {

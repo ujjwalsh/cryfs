@@ -5,6 +5,7 @@
 #include <cpp-utils/pointer/unique_ref.h>
 #include <string>
 #include <boost/filesystem/path.hpp>
+#include "Types.h"
 
 namespace fspp {
 class Device;
@@ -26,9 +27,9 @@ public:
     std::string name;
   };
 
-  virtual cpputils::unique_ref<OpenFile> createAndOpenFile(const std::string &name, mode_t mode, uid_t uid, gid_t gid) = 0;
-  virtual void createDir(const std::string &name, mode_t mode, uid_t uid, gid_t gid) = 0;
-  virtual void createSymlink(const std::string &name, const boost::filesystem::path &target, uid_t uid, gid_t gid) = 0;
+  virtual cpputils::unique_ref<OpenFile> createAndOpenFile(const std::string &name, fspp::mode_t mode, fspp::uid_t uid, fspp::gid_t gid) = 0;
+  virtual void createDir(const std::string &name, fspp::mode_t mode, fspp::uid_t uid, fspp::gid_t gid) = 0;
+  virtual void createSymlink(const std::string &name, const boost::filesystem::path &target, fspp::uid_t uid, fspp::gid_t gid) = 0;
 
   //TODO Allow alternative implementation returning only children names without more information
   //virtual std::unique_ptr<std::vector<std::string>> children() const = 0;

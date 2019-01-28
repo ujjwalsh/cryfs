@@ -1,9 +1,7 @@
 #include "testutils/FuseFdatasyncTest.h"
 
-#include "fspp/fuse/FuseErrnoException.h"
+#include "fspp/fs_interface/FuseErrnoException.h"
 
-using ::testing::_;
-using ::testing::StrEq;
 using ::testing::WithParamInterface;
 using ::testing::Values;
 using ::testing::Eq;
@@ -19,7 +17,7 @@ INSTANTIATE_TEST_CASE_P(FuseFdatasyncFileDescriptorTest, FuseFdatasyncFileDescri
 TEST_P(FuseFdatasyncFileDescriptorTest, FileDescriptorIsCorrect) {
   ReturnIsFileOnLstat(FILENAME);
   OnOpenReturnFileDescriptor(FILENAME, GetParam());
-  EXPECT_CALL(fsimpl, fdatasync(Eq(GetParam())))
+  EXPECT_CALL(*fsimpl, fdatasync(Eq(GetParam())))
     .Times(1).WillOnce(Return());
 
   FdatasyncFile(FILENAME);

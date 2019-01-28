@@ -12,6 +12,8 @@ using cpputils::make_unique_ref;
 using cpputils::AES256_GCM;
 using cpputils::AES256_CFB;
 using cpputils::Twofish128_CFB;
+using cpputils::serialize;
+using cpputils::deserialize;
 using namespace cryfs;
 
 // This is needed for google test
@@ -26,7 +28,9 @@ class ConcreteInnerEncryptorTest : public ::testing::Test {
 public:
     template<class Cipher>
     unique_ref<InnerEncryptor> makeInnerEncryptor() {
-        auto key = DataFixture::generateFixedSize<Cipher::EncryptionKey::BINARY_LENGTH>();
+        auto key = Cipher::EncryptionKey::FromString(
+            DataFixture::generateFixedSize<Cipher::KEYSIZE>().ToString()
+        );
         return make_unique_ref<ConcreteInnerEncryptor<Cipher>>(key);
     }
 };
@@ -63,7 +67,7 @@ TEST_F(ConcreteInnerEncryptorTest, DoesntDecryptWithWrongCipherName) {
 TEST_F(ConcreteInnerEncryptorTest, InvalidCiphertext) {
     auto encryptor = makeInnerEncryptor<AES256_GCM>();
     InnerConfig encrypted = encryptor->encrypt(DataFixture::generate(200));
-    *(char*)encrypted.encryptedConfig.data() = *(char*)encrypted.encryptedConfig.data()+1; //Modify ciphertext
+    serialize<uint8_t>(encrypted.encryptedConfig.data(), deserialize<uint8_t>(encrypted.encryptedConfig.data()) + 1); //Modify ciphertext
     auto decrypted = encryptor->decrypt(encrypted);
     EXPECT_EQ(none, decrypted);
 }

@@ -2,7 +2,7 @@
 #ifndef MESSMER_CPPUTILS_DATA_FIXEDSIZEDATA_H_
 #define MESSMER_CPPUTILS_DATA_FIXEDSIZEDATA_H_
 
-#include <cryptopp/hex.h>
+#include <vendor_cryptopp/hex.h>
 #include <string>
 #include <cstring>
 #include "../assert/assert.h"
@@ -34,7 +34,7 @@ public:
   template<size_t size> FixedSizeData<SIZE-size> drop() const;
 
 private:
-  FixedSizeData() {}
+  FixedSizeData(): _data() {}
   template<size_t _SIZE> friend class FixedSizeData;
 
   unsigned char _data[BINARY_LENGTH];
@@ -59,11 +59,13 @@ template<size_t SIZE>
 FixedSizeData<SIZE> FixedSizeData<SIZE>::FromString(const std::string &data) {
   ASSERT(data.size() == STRING_LENGTH, "Wrong string size for parsing FixedSizeData");
   FixedSizeData<SIZE> result;
-  CryptoPP::StringSource(data, true,
-    new CryptoPP::HexDecoder(
-      new CryptoPP::ArraySink(result._data, BINARY_LENGTH)
-    )
-  );
+  {
+    CryptoPP::StringSource _1(data, true,
+      new CryptoPP::HexDecoder(
+        new CryptoPP::ArraySink(result._data, BINARY_LENGTH)
+      )
+    );
+  }
   return result;
 }
 

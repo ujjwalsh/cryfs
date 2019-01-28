@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <regex>
+
+#ifdef NDEBUG
+#define _REAL_NDEBUG
+#endif
 
 //Include the ASSERT macro for a release build
 #ifndef NDEBUG
@@ -7,7 +12,7 @@
 #endif
 #include "cpp-utils/assert/assert.h"
 
-using testing::MatchesRegex;
+using testing::HasSubstr;
 
 TEST(AssertTest_ReleaseBuild, DoesntThrowIfTrue) {
   ASSERT(true, "bla");
@@ -25,8 +30,35 @@ TEST(AssertTest_ReleaseBuild, AssertMessage) {
     ASSERT(2==5, "my message");
     FAIL();
   } catch (const cpputils::AssertFailed &e) {
-    EXPECT_THAT(e.what(), MatchesRegex(
-        "Assertion \\[2==5\\] failed in .*/assert_release_test.cpp:25: my message.*"
+	  std::string msg = e.what();
+	  // For some reason, the following doesn't seem to work in MSVC. Possibly because of the multiline string?
+	  /*EXPECT_THAT(e.what(), MatchesRegex(
+		  R"(Assertion \[2==5\] failed in .*assert_release_test.cpp:27: my message)"
+	  ));*/
+	  EXPECT_TRUE(std::regex_search(e.what(), std::regex(R"(Assertion \[2==5\] failed in .*assert_release_test.cpp:30: my message)")));
+  }
+}
+
+#if !(defined(_MSC_VER) && defined(_REAL_NDEBUG))
+TEST(AssertTest_ReleaseBuild, AssertMessageContainsBacktrace) {
+  try {
+    ASSERT(2==5, "my message");
+    FAIL();
+  } catch (const cpputils::AssertFailed &e) {
+    EXPECT_THAT(e.what(), HasSubstr(
+            "cpputils::"
     ));
   }
 }
+#else
+TEST(AssertTest_ReleaseBuild, AssertMessageContainsBacktrace) {
+  try {
+    ASSERT(2==5, "my message");
+    FAIL();
+  } catch (const cpputils::AssertFailed &e) {
+    EXPECT_THAT(e.what(), HasSubstr(
+      "#1"
+    ));
+  }
+}
+#endif

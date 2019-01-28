@@ -4,7 +4,7 @@
 
 #include <cstring>
 #include <cstdint>
-#include <blockstore/utils/Key.h>
+#include <blockstore/utils/BlockId.h>
 #include <cpp-utils/data/Data.h>
 
 namespace blobstore {
@@ -13,8 +13,8 @@ class Blob {
 public:
   virtual ~Blob() {}
 
-  //TODO Use own Key class for blobstore
-  virtual const blockstore::Key &key() const = 0;
+  //TODO Use own Id class for blobstore
+  virtual const blockstore::BlockId &blockId() const = 0;
 
   virtual uint64_t size() const = 0;
   virtual void resize(uint64_t numBytes) = 0;
@@ -25,6 +25,8 @@ public:
   virtual void write(const void *source, uint64_t offset, uint64_t size) = 0;
 
   virtual void flush() = 0;
+
+  virtual uint32_t numNodes() const = 0;
 
   //TODO Test tryRead
 };

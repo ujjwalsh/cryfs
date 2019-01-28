@@ -1,14 +1,12 @@
 #include "testutils/FuseFTruncateTest.h"
 
-#include "fspp/fuse/FuseErrnoException.h"
+#include "fspp/fs_interface/FuseErrnoException.h"
 
 using ::testing::_;
-using ::testing::StrEq;
 using ::testing::WithParamInterface;
 using ::testing::Values;
 using ::testing::Eq;
 using ::testing::Return;
-using ::testing::Throw;
 
 using namespace fspp::fuse;
 
@@ -20,10 +18,10 @@ INSTANTIATE_TEST_CASE_P(FuseFTruncateFileDescriptorTest, FuseFTruncateFileDescri
 TEST_P(FuseFTruncateFileDescriptorTest, FileDescriptorIsCorrect) {
   ReturnIsFileOnLstat(FILENAME);
   OnOpenReturnFileDescriptor(FILENAME, GetParam());
-  EXPECT_CALL(fsimpl, ftruncate(Eq(GetParam()), _))
+  EXPECT_CALL(*fsimpl, ftruncate(Eq(GetParam()), _))
     .Times(1).WillOnce(Return());
   //Needed to make ::ftruncate system call return successfully
   ReturnIsFileOnFstat(GetParam());
 
-  FTruncateFile(FILENAME, 0);
+  FTruncateFile(FILENAME, fspp::num_bytes_t(0));
 }

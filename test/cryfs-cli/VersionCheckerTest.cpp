@@ -3,27 +3,25 @@
 #include <cpp-utils/network/FakeHttpClient.h>
 #include <cpp-utils/pointer/unique_ref.h>
 
-using std::shared_ptr;
-using std::make_shared;
 using std::string;
 using cpputils::FakeHttpClient;
 using cpputils::unique_ref;
 using cpputils::make_unique_ref;
 using boost::none;
-using namespace cryfs;
+using namespace cryfs_cli;
 
 class VersionCheckerTest: public ::testing::Test {
 public:
     unique_ref<VersionChecker> versionChecker() {
-        return make_unique_ref<VersionChecker>(http);
+        return make_unique_ref<VersionChecker>(_http.get());
     }
 
     void setVersionInfo(const string &versionInfo) {
-        http->addWebsite("https://www.cryfs.org/version_info.json", versionInfo);
+        _http->addWebsite("https://www.cryfs.org/version_info.json", versionInfo);
     }
 
 private:
-    shared_ptr<FakeHttpClient> http = make_shared<FakeHttpClient>();
+    unique_ref<FakeHttpClient> _http = make_unique_ref<FakeHttpClient>();
 };
 
 TEST_F(VersionCheckerTest, NewestVersion_NoInternet) {

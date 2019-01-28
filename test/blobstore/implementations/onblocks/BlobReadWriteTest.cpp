@@ -9,7 +9,7 @@ using ::testing::Values;
 
 using namespace blobstore;
 using blobstore::onblocks::datanodestore::DataNodeLayout;
-using blockstore::Key;
+using blockstore::BlockId;
 using cpputils::Data;
 using cpputils::DataFixture;
 
@@ -45,14 +45,14 @@ constexpr DataNodeLayout BlobReadWriteTest::LAYOUT;
 TEST_F(BlobReadWriteTest, WritingImmediatelyFlushes_SmallSize) {
 	blob->resize(5);
 	blob->write(randomData.data(), 0, 5);
-	auto loaded = loadBlob(blob->key());
+	auto loaded = loadBlob(blob->blockId());
 	EXPECT_DATA_READS_AS(randomData, *loaded, 0, 5);
 }
 
 TEST_F(BlobReadWriteTest, WritingImmediatelyFlushes_LargeSize) {
 	blob->resize(LARGE_SIZE);
 	blob->write(randomData.data(), 0, LARGE_SIZE);
-	auto loaded = loadBlob(blob->key());
+	auto loaded = loadBlob(blob->blockId());
 	EXPECT_DATA_READS_AS(randomData, *loaded, 0, LARGE_SIZE);
 }
 
@@ -150,9 +150,9 @@ TEST_F(BlobReadWriteTest, givenBlobResizedToZero_whenWriteZeroBytes_thenDoesntGr
 }
 
 struct DataRange {
-  size_t blobsize;
-  off_t offset;
-  size_t count;
+  uint64_t blobsize;
+  uint64_t offset;
+  uint64_t count;
 };
 class BlobReadWriteDataTest: public BlobReadWriteTest, public WithParamInterface<DataRange> {
 public:
@@ -165,18 +165,18 @@ public:
   }
 
   template<class DataClass>
-  void EXPECT_DATA_READS_AS_OUTSIDE_OF(const DataClass &expected, const Blob &blob, off_t start, size_t count) {
+  void EXPECT_DATA_READS_AS_OUTSIDE_OF(const DataClass &expected, const Blob &blob, uint64_t start, uint64_t count) {
     Data begin(start);
     Data end(GetParam().blobsize - count - start);
 
     std::memcpy(begin.data(), expected.data(), start);
-    std::memcpy(end.data(), (uint8_t*)expected.data()+start+count, end.size());
+    std::memcpy(end.data(), expected.dataOffset(start+count), end.size());
 
     EXPECT_DATA_READS_AS(begin, blob, 0, start);
     EXPECT_DATA_READS_AS(end, blob, start + count, end.size());
   }
 
-  void EXPECT_DATA_IS_ZEROES_OUTSIDE_OF(const Blob &blob, off_t start, size_t count) {
+  void EXPECT_DATA_IS_ZEROES_OUTSIDE_OF(const Blob &blob, uint64_t start, uint64_t count) {
     Data ZEROES(GetParam().blobsize);
     ZEROES.FillWithZeroes();
     EXPECT_DATA_READS_AS_OUTSIDE_OF(ZEROES, blob, start, count);
@@ -219,7 +219,7 @@ TEST_P(BlobReadWriteDataTest, WriteAndReadImmediately) {
 TEST_P(BlobReadWriteDataTest, WriteAndReadAfterLoading) {
   blob->resize(GetParam().blobsize);
   blob->write(this->foregroundData.data(), GetParam().offset, GetParam().count);
-  auto loaded = loadBlob(blob->key());
+  auto loaded = loadBlob(blob->blockId());
 
   EXPECT_DATA_READS_AS(this->foregroundData, *loaded, GetParam().offset, GetParam().count);
   EXPECT_DATA_IS_ZEROES_OUTSIDE_OF(*loaded, GetParam().offset, GetParam().count);
@@ -238,7 +238,7 @@ TEST_P(BlobReadWriteDataTest, WriteWholeAndReadPart) {
   blob->write(this->backgroundData.data(), 0, GetParam().blobsize);
   Data read(GetParam().count);
   blob->read(read.data(), GetParam().offset, GetParam().count);
-  EXPECT_EQ(0, std::memcmp(read.data(), (uint8_t*)this->backgroundData.data()+GetParam().offset, GetParam().count));
+  EXPECT_EQ(0, std::memcmp(read.data(), this->backgroundData.dataOffset(GetParam().offset), GetParam().count));
 }
 
 TEST_P(BlobReadWriteDataTest, WritePartAndReadWhole) {
@@ -247,6 +247,6 @@ TEST_P(BlobReadWriteDataTest, WritePartAndReadWhole) {
   blob->write(this->foregroundData.data(), GetParam().offset, GetParam().count);
   Data read = readBlob(*blob);
   EXPECT_EQ(0, std::memcmp(read.data(), this->backgroundData.data(), GetParam().offset));
-  EXPECT_EQ(0, std::memcmp((uint8_t*)read.data()+GetParam().offset, this->foregroundData.data(), GetParam().count));
-  EXPECT_EQ(0, std::memcmp((uint8_t*)read.data()+GetParam().offset+GetParam().count, (uint8_t*)this->backgroundData.data()+GetParam().offset+GetParam().count, GetParam().blobsize-GetParam().count-GetParam().offset));
+  EXPECT_EQ(0, std::memcmp(read.dataOffset(GetParam().offset), this->foregroundData.data(), GetParam().count));
+  EXPECT_EQ(0, std::memcmp(read.dataOffset(GetParam().offset+GetParam().count), this->backgroundData.dataOffset(GetParam().offset+GetParam().count), GetParam().blobsize-GetParam().count-GetParam().offset));
 }

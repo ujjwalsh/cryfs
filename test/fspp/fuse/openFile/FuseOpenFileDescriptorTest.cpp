@@ -5,21 +5,23 @@ using ::testing::StrEq;
 using ::testing::WithParamInterface;
 using ::testing::Values;
 using ::testing::Return;
+using cpputils::unique_ref;
+using cpputils::make_unique_ref;
 
 class FuseOpenFileDescriptorTest: public FuseOpenTest, public WithParamInterface<int> {
 public:
   void OpenAndReadFile(const char *filename) {
     auto fs = TestFS();
 
-    int fd = OpenFile(fs.get(), filename);
-    ReadFile(fd);
+    auto fd = OpenFile(fs.get(), filename);
+    ReadFile(fd->fd());
   }
 
 private:
-  int OpenFile(const TempTestFS *fs, const char *filename) {
+  unique_ref<OpenFileHandle> OpenFile(const TempTestFS *fs, const char *filename) {
     auto realpath = fs->mountDir() / filename;
-    int fd = ::open(realpath.c_str(), O_RDONLY);
-    EXPECT_GE(fd, 0) << "Opening file failed";
+    auto fd = make_unique_ref<OpenFileHandle>(realpath.string().c_str(), O_RDONLY);
+    EXPECT_GE(fd->fd(), 0) << "Opening file failed";
     return fd;
   }
   void ReadFile(int fd) {
@@ -31,10 +33,10 @@ private:
 INSTANTIATE_TEST_CASE_P(FuseOpenFileDescriptorTest, FuseOpenFileDescriptorTest, Values(0, 2, 5, 1000, 1024*1024*1024));
 
 TEST_P(FuseOpenFileDescriptorTest, TestReturnedFileDescriptor) {
-  ReturnIsFileOnLstatWithSize(FILENAME, 1);
-  EXPECT_CALL(fsimpl, openFile(StrEq(FILENAME), _))
+  ReturnIsFileOnLstatWithSize(FILENAME, fspp::num_bytes_t(1));
+  EXPECT_CALL(*fsimpl, openFile(StrEq(FILENAME), _))
     .Times(1).WillOnce(Return(GetParam()));
-  EXPECT_CALL(fsimpl, read(GetParam(), _, _, _)).Times(1).WillOnce(Return(1));
+  EXPECT_CALL(*fsimpl, read(GetParam(), _, _, _)).Times(1).WillOnce(Return(fspp::num_bytes_t(1)));
 
   OpenAndReadFile(FILENAME);
 }

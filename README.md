@@ -1,14 +1,35 @@
-# CryFS [![Build Status](https://travis-ci.org/cryfs/cryfs.svg?branch=master)](https://travis-ci.org/cryfs/cryfs)
+# CryFS [![Build Status](https://travis-ci.org/cryfs/cryfs.svg?branch=master)](https://travis-ci.org/cryfs/cryfs) [![CircleCI](https://circleci.com/gh/cryfs/cryfs/tree/master.svg?style=svg)](https://circleci.com/gh/cryfs/cryfs/tree/master) [![Build status](https://ci.appveyor.com/api/projects/status/84ouutflsnap9dlv/branch/develop?svg=true)](https://ci.appveyor.com/project/smessmer/cryfs/branch/develop)
+
 CryFS encrypts your files, so you can safely store them anywhere. It works well together with cloud services like Dropbox, iCloud, OneDrive and others.
 See [https://www.cryfs.org](https://www.cryfs.org).
 
 Install latest release
 ======================
 
+Linux
+------
+
 This only works for Ubuntu 17.04 and later, and Debian Stretch and later.
 You can also use CryFS on older versions of these distributions by following the **Building from source** instructions below.
 
     sudo apt install cryfs
+    
+OSX
+----
+
+CryFS is distributed via Homebrew. Just do
+
+    brew cask install osxfuse
+    brew install cryfs
+    
+Windows (experimental)
+----------------------
+
+CryFS has experimental Windows support since the 0.10 release series. To install it, do:
+
+1. Install [DokanY](https://github.com/dokan-dev/dokany/releases)
+2. Install [Microsoft Visual C++ Redistributable for Visual Studio 2017](https://support.microsoft.com/en-us/help/2977003/the-latest-supported-visual-c-downloads)
+3. Install [CryFS](https://www.cryfs.org/#download)
 
 GUI
 ===
@@ -22,30 +43,30 @@ Building from source
 Requirements
 ------------
   - Git (for getting the source code)
-  - GCC version >= 4.8 or Clang >= 3.7
-  - CMake version >= 2.8
+  - GCC version >= 5.0 or Clang >= 4.0
+  - CMake version >= 3.0 
   - libcurl4 (including development headers)
-  - Boost libraries version >= 1.56 (including development headers)
+  - Boost libraries version >= 1.57 (including development headers)
     - filesystem
     - system
     - chrono
     - program_options
     - thread
-  - Crypto++ version >= 5.6.3 (including development headers)
   - SSL development libraries (including development headers, e.g. libssl-dev)
   - libFUSE version >= 2.8.6 (including development headers), on Mac OS X instead install osxfuse from https://osxfuse.github.io/
   - Python >= 2.7
+  - OpenMP
 
 You can use the following commands to install these requirements
 
         # Ubuntu
-        $ sudo apt-get install git g++ cmake make libcurl4-openssl-dev libboost-filesystem-dev libboost-system-dev libboost-chrono-dev libboost-program-options-dev libboost-thread-dev libcrypto++-dev libssl-dev libfuse-dev python
+        $ sudo apt-get install git g++ cmake make libcurl4-openssl-dev libboost-filesystem-dev libboost-system-dev libboost-chrono-dev libboost-program-options-dev libboost-thread-dev libssl-dev libfuse-dev python
 
         # Fedora
-        sudo dnf install git gcc-c++ cmake make libcurl-devel boost-devel boost-static cryptopp-devel openssl-devel fuse-devel python
+        sudo dnf install git gcc-c++ cmake make libcurl-devel boost-devel boost-static openssl-devel fuse-devel python
 
         # Macintosh
-        brew install cmake boost cryptopp openssl
+        brew install cmake boost openssl libomp
 
 Build & Install
 ---------------
@@ -69,6 +90,16 @@ You can pass the following variables to the *cmake* command (using *-Dvariablena
  - **-DCMAKE_BUILD_TYPE**=[Release|Debug]: Whether to run code optimization or add debug symbols. Default: Release
  - **-DBUILD_TESTING**=[on|off]: Whether to build the test cases (can take a long time). Default: off
  - **-DCRYFS_UPDATE_CHECKS**=off: Build a CryFS that doesn't check online for updates and security vulnerabilities.
+
+Building on Windows (experimental)
+----------------------------------
+
+Build with Visual Studio 2017 and pass in the following flags to CMake:
+
+    -DDOKAN_PATH=[dokan library location, e.g. "C:\Program Files\Dokan\DokanLibrary-1.1.0"]
+    -DBOOST_ROOT=[path to root of boost installation]
+
+If you set these variables correctly in the `CMakeSettings.json` file, you should be able to open the cryfs source folder with Visual Studio 2017.
 
 Troubleshooting
 ---------------
@@ -97,17 +128,24 @@ On most systems, CMake should find the libraries automatically. However, that do
 
         cmake .. -DCMAKE_CXX_FLAGS="-I/path/to/fuse/or/osxfuse/headers"
 
-4. **CryptoPP library not found**
-
-    Pass in the library path with
-
-        cmake .. -DCRYPTOPP_LIB_PATH=/path/to/cryptopp
-
-5. **Openssl headers not found**
+4. **Openssl headers not found**
 
     Pass in the include path with
 
         cmake .. -DCMAKE_C_FLAGS="-I/path/to/openssl/include"
+
+5. **OpenMP not found (osx)**
+
+    Either build it without OpenMP
+
+        cmake .. -DDISABLE_OPENMP=on
+
+    but that will cause slower file system mount times (performance after mounting will be unaffected).
+    If you installed OpenMP with homebrew or macports, it should be autodetected.
+    If that doesn't work for some reason (or you want to use a different installation than the autodetected one),
+    pass in these flags:
+
+        cmake .. -DOpenMP_CXX_FLAGS='-Xpreprocessor -fopenmp -I/path/to/openmp/include' -DOpenMP_CXX_LIB_NAMES=omp -DOpenMP_omp_LIBRARY=/path/to/libomp.dylib
 
 
 Creating .deb and .rpm packages
@@ -125,7 +163,7 @@ There are additional requirements if you want to create packages. They are:
  2. Build
 
         $ mkdir cmake && cd cmake
-        $ cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=off
+        $ cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=off
         $ make package
 
 
