@@ -1,6 +1,13 @@
 
 # cryfs-cli-test and fspp-test are disabled for requiring fuse
 
-Tests: blobstore-test, blockstore-test, parallelaccessstore-test, cryfs-test, gitversion-test
+Tests:	blobstore-test,
+	blockstore-test,
+	cpp-utils-test,
+	cpp-utils-test_exit_signal,
+	cpp-utils-test_exit_status,
+	cryfs-test,
+	gitversion-test
+	parallelaccessstore-test,
 Depends: @, @builddeps@
 Restrictions: build-needed
