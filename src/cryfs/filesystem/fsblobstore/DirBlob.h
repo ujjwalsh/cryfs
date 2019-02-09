@@ -2,9 +2,10 @@
 #ifndef MESSMER_CRYFS_FILESYSTEM_FSBLOBSTORE_DIRBLOB_H_
 #define MESSMER_CRYFS_FILESYSTEM_FSBLOBSTORE_DIRBLOB_H_
 
-#include <blockstore/utils/Key.h>
+#include <blockstore/utils/BlockId.h>
 #include <cpp-utils/macros.h>
 #include <fspp/fs_interface/Dir.h>
+#include <fspp/fs_interface/Node.h>
 #include "FsBlob.h"
 #include "utils/DirEntryList.h"
 #include <mutex>
@@ -15,16 +16,17 @@ namespace cryfs {
 
         class DirBlob final : public FsBlob {
         public:
-            constexpr static off_t DIR_LSTAT_SIZE = 4096;
+            constexpr static fspp::num_bytes_t DIR_LSTAT_SIZE = fspp::num_bytes_t(4096);
 
-            static cpputils::unique_ref<DirBlob> InitializeEmptyDir(FsBlobStore *fsBlobStore, cpputils::unique_ref<blobstore::Blob> blob,
-                                                                    std::function<off_t (const blockstore::Key&)> getLstatSize);
+            static cpputils::unique_ref<DirBlob> InitializeEmptyDir(cpputils::unique_ref<blobstore::Blob> blob,
+                                                                    const blockstore::BlockId &parent,
+                                                                    std::function<fspp::num_bytes_t (const blockstore::BlockId&)> getLstatSize);
 
-            DirBlob(FsBlobStore *fsBlobStore, cpputils::unique_ref<blobstore::Blob> blob, std::function<off_t (const blockstore::Key&)> getLstatSize);
+            DirBlob(cpputils::unique_ref<blobstore::Blob> blob, std::function<fspp::num_bytes_t (const blockstore::BlockId&)> getLstatSize);
 
             ~DirBlob();
 
-            off_t lstat_size() const override;
+            fspp::num_bytes_t lstat_size() const override;
 
             void AppendChildrenTo(std::vector<fspp::Dir::Entry> *result) const;
 
@@ -33,57 +35,57 @@ namespace cryfs {
 
             boost::optional<const DirEntry&> GetChild(const std::string &name) const;
 
-            boost::optional<const DirEntry&> GetChild(const blockstore::Key &key) const;
+            boost::optional<const DirEntry&> GetChild(const blockstore::BlockId &blobId) const;
 
-            void AddChildDir(const std::string &name, const blockstore::Key &blobKey, mode_t mode, uid_t uid,
-                             gid_t gid, timespec lastAccessTime, timespec lastModificationTime);
+            void AddChildDir(const std::string &name, const blockstore::BlockId &blobId, fspp::mode_t mode, fspp::uid_t uid,
+                             fspp::gid_t gid, timespec lastAccessTime, timespec lastModificationTime);
 
-            void AddChildFile(const std::string &name, const blockstore::Key &blobKey, mode_t mode, uid_t uid,
-                              gid_t gid, timespec lastAccessTime, timespec lastModificationTime);
+            void AddChildFile(const std::string &name, const blockstore::BlockId &blobId, fspp::mode_t mode, fspp::uid_t uid,
+                              fspp::gid_t gid, timespec lastAccessTime, timespec lastModificationTime);
 
-            void AddChildSymlink(const std::string &name, const blockstore::Key &blobKey, uid_t uid, gid_t gid, timespec lastAccessTime, timespec lastModificationTime);
+            void AddChildSymlink(const std::string &name, const blockstore::BlockId &blobId, fspp::uid_t uid, fspp::gid_t gid, timespec lastAccessTime, timespec lastModificationTime);
 
-            void AddOrOverwriteChild(const std::string &name, const blockstore::Key &blobKey, fspp::Dir::EntryType type,
-                          mode_t mode, uid_t uid, gid_t gid, timespec lastAccessTime, timespec lastModificationTime,
-                          std::function<void (const blockstore::Key &key)> onOverwritten);
+            void AddOrOverwriteChild(const std::string &name, const blockstore::BlockId &blobId, fspp::Dir::EntryType type,
+                          fspp::mode_t mode, fspp::uid_t uid, fspp::gid_t gid, timespec lastAccessTime, timespec lastModificationTime,
+                          std::function<void (const blockstore::BlockId &blockId)> onOverwritten);
 
-            void RenameChild(const blockstore::Key &key, const std::string &newName, std::function<void (const blockstore::Key &key)> onOverwritten);
+            void RenameChild(const blockstore::BlockId &blockId, const std::string &newName, std::function<void (const blockstore::BlockId &blockId)> onOverwritten);
 
             void RemoveChild(const std::string &name);
 
-            void RemoveChild(const blockstore::Key &key);
+            void RemoveChild(const blockstore::BlockId &blockId);
 
             void flush();
 
-            void statChild(const blockstore::Key &key, struct ::stat *result) const;
+            fspp::Node::stat_info statChild(const blockstore::BlockId &blockId) const;
 
-            void statChildWithSizeAlreadySet(const blockstore::Key &key, struct ::stat *result) const;
+            fspp::Node::stat_info statChildWithKnownSize(const blockstore::BlockId &blockId, fspp::num_bytes_t size) const;
 
-            void updateAccessTimestampForChild(const blockstore::Key &key);
+            void updateAccessTimestampForChild(const blockstore::BlockId &blockId, TimestampUpdateBehavior timestampUpdateBehavior);
 
-            void updateModificationTimestampForChild(const blockstore::Key &key);
+            void updateModificationTimestampForChild(const blockstore::BlockId &blockId);
 
-            void chmodChild(const blockstore::Key &key, mode_t mode);
+            void chmodChild(const blockstore::BlockId &blockId, fspp::mode_t mode);
 
-            void chownChild(const blockstore::Key &key, uid_t uid, gid_t gid);
+            void chownChild(const blockstore::BlockId &blockId, fspp::uid_t uid, fspp::gid_t gid);
 
-            void utimensChild(const blockstore::Key &key, timespec lastAccessTime, timespec lastModificationTime);
+            void utimensChild(const blockstore::BlockId &blockId, timespec lastAccessTime, timespec lastModificationTime);
 
-            void setLstatSizeGetter(std::function<off_t(const blockstore::Key&)> getLstatSize);
+            void setLstatSizeGetter(std::function<fspp::num_bytes_t(const blockstore::BlockId&)> getLstatSize);
 
         private:
 
-            void _addChild(const std::string &name, const blockstore::Key &blobKey, fspp::Dir::EntryType type,
-                          mode_t mode, uid_t uid, gid_t gid, timespec lastAccessTime, timespec lastModificationTime);
+            void _addChild(const std::string &name, const blockstore::BlockId &blobId, fspp::Dir::EntryType type,
+                          fspp::mode_t mode, fspp::uid_t uid, fspp::gid_t gid, timespec lastAccessTime, timespec lastModificationTime);
             void _readEntriesFromBlob();
             void _writeEntriesToBlob();
 
             cpputils::unique_ref<blobstore::Blob> releaseBaseBlob() override;
 
-            FsBlobStore *_fsBlobStore;
-            std::function<off_t (const blockstore::Key&)> _getLstatSize;
+            std::function<fspp::num_bytes_t (const blockstore::BlockId&)> _getLstatSize;
+            mutable std::mutex _getLstatSizeMutex;
             DirEntryList _entries;
-            mutable std::mutex _mutex;
+            mutable std::mutex _entriesAndChangedMutex;
             bool _changed;
 
             DISALLOW_COPY_AND_ASSIGN(DirBlob);

@@ -1,15 +1,9 @@
 #include "../../testutils/FuseTest.h"
+#include "../../testutils/OpenFileHandle.h"
 #include <condition_variable>
 
-using ::testing::_;
-using ::testing::StrEq;
-using ::testing::Eq;
 using ::testing::WithParamInterface;
 using ::testing::Values;
-using ::testing::Return;
-using ::testing::Invoke;
-using ::testing::InSequence;
-using ::testing::AtLeast;
 
 using std::string;
 using std::mutex;
@@ -17,6 +11,8 @@ using std::unique_lock;
 using std::condition_variable;
 using std::chrono::duration;
 using std::chrono::seconds;
+using cpputils::unique_ref;
+using cpputils::make_unique_ref;
 
 // The fuse behaviour is: For each open(), there will be exactly one call to release().
 // Directly before this call to release(), flush() will be called. After flush() returns,
@@ -58,20 +54,21 @@ public:
 
   void OpenAndCloseFile(const string &filename) {
     auto fs = TestFS();
-    int fd = OpenFile(fs.get(), filename);
-    CloseFile(fd);
+    auto fd = OpenFile(fs.get(), filename);
+    CloseFile(std::move(fd));
   }
 
-  int OpenFile(const TempTestFS *fs, const string &filename) {
+  unique_ref<OpenFileHandle> OpenFile(const TempTestFS *fs, const string &filename) {
     auto real_path = fs->mountDir() / filename;
-    int fd = ::open(real_path.c_str(), O_RDONLY);
-    EXPECT_GE(fd, 0) << "Opening file failed";
+    auto fd = make_unique_ref<OpenFileHandle>(real_path.string().c_str(), O_RDONLY);
+    EXPECT_GE(fd->fd(), 0) << "Opening file failed";
     return fd;
   }
 
-  void CloseFile(int fd) {
-    int retval = ::close(fd);
+  void CloseFile(unique_ref<OpenFileHandle> fd) {
+    int retval = ::close(fd->fd());
     EXPECT_EQ(0, retval);
+    fd->release(); // don't try closing it again
   }
 };
 INSTANTIATE_TEST_CASE_P(FuseCloseTest, FuseCloseTest, Values(0, 1, 2, 100, 1024*1024*1024));
@@ -82,11 +79,11 @@ INSTANTIATE_TEST_CASE_P(FuseCloseTest, FuseCloseTest, Values(0, 1, 2, 100, 1024*
   Barrier barrier;
 
   ReturnIsFileOnLstat(FILENAME);
-  EXPECT_CALL(fsimpl, openFile(StrEq(FILENAME), _)).WillOnce(Return(GetParam()));
+  EXPECT_CALL(*fsimpl, openFile(StrEq(FILENAME), _)).WillOnce(Return(GetParam()));
   {
     //InSequence fileCloseSequence;
-    EXPECT_CALL(fsimpl, flush(Eq(GetParam()))).Times(1);
-    EXPECT_CALL(fsimpl, closeFile(Eq(GetParam()))).Times(1).WillOnce(Invoke([&barrier] (int) {
+    EXPECT_CALL(*fsimpl, flush(Eq(GetParam()))).Times(1);
+    EXPECT_CALL(*fsimpl, closeFile(Eq(GetParam()))).Times(1).WillOnce(Invoke([&barrier] (int) {
       // Release the waiting lock at the end of this test case, because the fuse release() came in now.
       barrier.Release();
     }));

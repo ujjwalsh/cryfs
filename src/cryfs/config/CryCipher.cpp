@@ -1,20 +1,19 @@
 #include "CryCipher.h"
 
 #include <cpp-utils/crypto/symmetric/ciphers.h>
-#include <blockstore/implementations/encrypted/EncryptedBlockStore.h>
+#include <blockstore/implementations/encrypted/EncryptedBlockStore2.h>
 #include "crypto/inner/ConcreteInnerEncryptor.h"
 
 using std::vector;
 using std::string;
 using cpputils::unique_ref;
 using cpputils::make_unique_ref;
-using cpputils::FixedSizeData;
-using blockstore::BlockStore;
+using blockstore::BlockStore2;
 using std::shared_ptr;
 using std::make_shared;
 using boost::optional;
 using boost::none;
-using blockstore::encrypted::EncryptedBlockStore;
+using blockstore::encrypted::EncryptedBlockStore2;
 
 using namespace cryfs;
 using namespace cpputils;
@@ -26,7 +25,7 @@ class CryCipherInstance: public CryCipher {
 public:
     BOOST_CONCEPT_ASSERT((CipherConcept<Cipher>));
 
-    static_assert(Cipher::EncryptionKey::BINARY_LENGTH <= CryCiphers::MAX_KEY_SIZE, "The key size for this cipher is too large. Please modify CryCiphers::MAX_KEY_SIZE");
+    static_assert(Cipher::KEYSIZE <= CryCiphers::MAX_KEY_SIZE, "The key size for this cipher is too large. Please modify CryCiphers::MAX_KEY_SIZE");
 
     CryCipherInstance(const optional<string> warning = none): _warning(warning) {
     }
@@ -39,16 +38,17 @@ public:
         return _warning;
     }
 
-    unique_ref<BlockStore> createEncryptedBlockstore(unique_ref<BlockStore> baseBlockStore, const string &encKey) const override {
-        return make_unique_ref<EncryptedBlockStore<Cipher>>(std::move(baseBlockStore), Cipher::EncryptionKey::FromString(encKey));
+    unique_ref<BlockStore2> createEncryptedBlockstore(unique_ref<BlockStore2> baseBlockStore, const string &encKey) const override {
+        return make_unique_ref<EncryptedBlockStore2<Cipher>>(std::move(baseBlockStore), Cipher::EncryptionKey::FromString(encKey));
     }
 
     string createKey(cpputils::RandomGenerator &randomGenerator) const override {
-        return Cipher::CreateKey(randomGenerator).ToString();
+        return Cipher::EncryptionKey::CreateKey(randomGenerator, Cipher::KEYSIZE).ToString();
     }
 
-    unique_ref<InnerEncryptor> createInnerConfigEncryptor(const FixedSizeData<CryCiphers::MAX_KEY_SIZE> &key) const override {
-        return make_unique_ref<ConcreteInnerEncryptor<Cipher>>(key.take<Cipher::EncryptionKey::BINARY_LENGTH>());
+    unique_ref<InnerEncryptor> createInnerConfigEncryptor(const EncryptionKey& key) const override {
+        ASSERT(key.binaryLength() == CryCiphers::MAX_KEY_SIZE, "Wrong key size");
+        return make_unique_ref<ConcreteInnerEncryptor<Cipher>>(key.take(Cipher::KEYSIZE));
     }
 
 private:
@@ -92,10 +92,15 @@ const CryCipher& CryCiphers::find(const string &cipherName) {
     return **found;
 }
 
-vector<string> CryCiphers::supportedCipherNames() {
-    vector<string> result;
-    for (const auto& cipher : CryCiphers::SUPPORTED_CIPHERS) {
-        result.push_back(cipher->cipherName());
-    }
-    return result;
+vector<string> CryCiphers::_buildSupportedCipherNames() {
+	vector<string> result;
+	for (const auto& cipher : CryCiphers::SUPPORTED_CIPHERS) {
+		result.push_back(cipher->cipherName());
+	}
+	return result;
+}
+
+const vector<string>& CryCiphers::supportedCipherNames() {
+	static vector<string> supportedCipherNames = _buildSupportedCipherNames();
+	return supportedCipherNames;
 }

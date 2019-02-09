@@ -11,13 +11,13 @@ namespace cryfs {
         class SymlinkBlob final: public FsBlob {
         public:
             static cpputils::unique_ref<SymlinkBlob> InitializeSymlink(cpputils::unique_ref<blobstore::Blob> blob,
-                                                                       const boost::filesystem::path &target);
+                                                                       const boost::filesystem::path &target, const blockstore::BlockId &parent);
 
             SymlinkBlob(cpputils::unique_ref<blobstore::Blob> blob);
 
             const boost::filesystem::path &target() const;
 
-            off_t lstat_size() const override;
+            fspp::num_bytes_t lstat_size() const override;
 
         private:
             boost::filesystem::path _target;

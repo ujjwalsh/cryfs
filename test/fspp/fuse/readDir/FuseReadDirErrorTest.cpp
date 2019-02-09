@@ -1,14 +1,12 @@
 #include "testutils/FuseReadDirTest.h"
 
-#include "fspp/fuse/FuseErrnoException.h"
+#include "fspp/fs_interface/FuseErrnoException.h"
 
-using ::testing::_;
 using ::testing::StrEq;
 using ::testing::Throw;
 using ::testing::WithParamInterface;
 using ::testing::Values;
 
-using std::vector;
 using std::string;
 
 using namespace fspp::fuse;
@@ -21,7 +19,7 @@ INSTANTIATE_TEST_CASE_P(FuseReadDirErrorTest, FuseReadDirErrorTest, Values(EACCE
 
 TEST_F(FuseReadDirErrorTest, NoError) {
   ReturnIsDirOnLstat(DIRNAME);
-  EXPECT_CALL(fsimpl, readDir(StrEq(DIRNAME)))
+  EXPECT_CALL(*fsimpl, readDir(StrEq(DIRNAME)))
     .Times(1).WillOnce(ReturnDirEntries({}));
 
   int error = ReadDirReturnError(DIRNAME);
@@ -30,7 +28,7 @@ TEST_F(FuseReadDirErrorTest, NoError) {
 
 TEST_P(FuseReadDirErrorTest, ReturnedErrorCodeIsCorrect) {
   ReturnIsDirOnLstat(DIRNAME);
-  EXPECT_CALL(fsimpl, readDir(StrEq(DIRNAME)))
+  EXPECT_CALL(*fsimpl, readDir(StrEq(DIRNAME)))
     .Times(1).WillOnce(Throw(FuseErrnoException(GetParam())));
 
   int error = ReadDirReturnError(DIRNAME);

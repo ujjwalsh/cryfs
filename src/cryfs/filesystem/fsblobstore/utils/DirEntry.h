@@ -2,20 +2,19 @@
 #ifndef MESSMER_CRYFS_FILESYSTEM_FSBLOBSTORE_UTILS_DIRENTRY_H
 #define MESSMER_CRYFS_FILESYSTEM_FSBLOBSTORE_UTILS_DIRENTRY_H
 
-#include <blockstore/utils/Key.h>
+#include <blockstore/utils/BlockId.h>
 #include <fspp/fs_interface/Dir.h>
+#include <fspp/fs_interface/Types.h>
 #include <cpp-utils/system/time.h>
 #include <sys/stat.h>
-
-// TODO Implement (and test) atime, noatime, strictatime, relatime mount options
 
 namespace cryfs {
     namespace fsblobstore {
 
         class DirEntry final {
         public:
-            DirEntry(fspp::Dir::EntryType type, const std::string &name, const blockstore::Key &key, mode_t mode,
-                  uid_t uid, gid_t gid, timespec lastAccessTime, timespec lastModificationTime,
+            DirEntry(fspp::Dir::EntryType type, const std::string &name, const blockstore::BlockId &blockId, fspp::mode_t mode,
+                  fspp::uid_t uid, fspp::gid_t gid, timespec lastAccessTime, timespec lastModificationTime,
                   timespec lastMetadataChangeTime);
 
             void serialize(uint8_t* dest) const;
@@ -28,16 +27,16 @@ namespace cryfs {
             const std::string &name() const;
             void setName(const std::string &value);
 
-            const blockstore::Key &key() const;
+            const blockstore::BlockId &blockId() const;
 
-            mode_t mode() const;
-            void setMode(mode_t value);
+            fspp::mode_t mode() const;
+            void setMode(fspp::mode_t value);
 
-            uid_t uid() const;
-            void setUid(uid_t value);
+            fspp::uid_t uid() const;
+            void setUid(fspp::uid_t value);
 
-            gid_t gid() const;
-            void setGid(gid_t value);
+            fspp::gid_t gid() const;
+            void setGid(fspp::gid_t value);
 
             timespec lastAccessTime() const;
             void setLastAccessTime(timespec value);
@@ -48,50 +47,39 @@ namespace cryfs {
             timespec lastMetadataChangeTime() const;
 
         private:
-            static size_t _serializedTimeValueSize();
-            static unsigned int _serializeTimeValue(uint8_t *dest, timespec value);
-            static unsigned int _serializeUint8(uint8_t *dest, uint8_t value);
-            static unsigned int _serializeUint32(uint8_t *dest, uint32_t value);
-            static unsigned int _serializeString(uint8_t *dest, const std::string &value);
-            static unsigned int _serializeKey(uint8_t *dest, const blockstore::Key &value);
-            static timespec _deserializeTimeValue(const char **pos);
-            static uint8_t _deserializeUint8(const char **pos);
-            static uint32_t _deserializeUint32(const char **pos);
-            static std::string _deserializeString(const char **pos);
-            static blockstore::Key _deserializeKey(const char **pos);
 
             void _updateLastMetadataChangeTime();
 
             fspp::Dir::EntryType _type;
             std::string _name;
-            blockstore::Key _key;
-            mode_t _mode;
-            uid_t _uid;
-            gid_t _gid;
+            blockstore::BlockId _blockId;
+            fspp::mode_t _mode;
+            fspp::uid_t _uid;
+            fspp::gid_t _gid;
             timespec _lastAccessTime;
             timespec _lastModificationTime;
             timespec _lastMetadataChangeTime;
         };
 
-        inline DirEntry::DirEntry(fspp::Dir::EntryType type, const std::string &name, const blockstore::Key &key, mode_t mode,
-            uid_t uid, gid_t gid, timespec lastAccessTime, timespec lastModificationTime,
+        inline DirEntry::DirEntry(fspp::Dir::EntryType type, const std::string &name, const blockstore::BlockId &blockId, fspp::mode_t mode,
+            fspp::uid_t uid, fspp::gid_t gid, timespec lastAccessTime, timespec lastModificationTime,
             timespec lastMetadataChangeTime)
-                : _type(type), _name(name), _key(key), _mode(mode), _uid(uid), _gid(gid), _lastAccessTime(lastAccessTime),
+                : _type(type), _name(name), _blockId(blockId), _mode(mode), _uid(uid), _gid(gid), _lastAccessTime(lastAccessTime),
                 _lastModificationTime(lastModificationTime), _lastMetadataChangeTime(lastMetadataChangeTime) {
             switch (_type) {
                 case fspp::Dir::EntryType::FILE:
-                    _mode |= S_IFREG;
+                    _mode.addFileFlag();
                     break;
                 case fspp::Dir::EntryType::DIR:
-                    _mode |= S_IFDIR;
+                    _mode.addDirFlag();
                     break;
                 case fspp::Dir::EntryType::SYMLINK:
-                    _mode |= S_IFLNK;
+                    _mode.addSymlinkFlag();
                     break;
             }
-            ASSERT((S_ISREG(_mode) && _type == fspp::Dir::EntryType::FILE) ||
-                   (S_ISDIR(_mode) && _type == fspp::Dir::EntryType::DIR) ||
-                   (S_ISLNK(_mode) && _type == fspp::Dir::EntryType::SYMLINK), "Unknown mode in entry");
+            ASSERT((_mode.hasFileFlag() && _type == fspp::Dir::EntryType::FILE) ||
+                   (_mode.hasDirFlag() && _type == fspp::Dir::EntryType::DIR) ||
+                   (_mode.hasSymlinkFlag() && _type == fspp::Dir::EntryType::SYMLINK), "Unknown mode in entry");
         }
 
         inline fspp::Dir::EntryType DirEntry::type() const {
@@ -102,19 +90,19 @@ namespace cryfs {
             return _name;
         }
 
-        inline const blockstore::Key &DirEntry::key() const {
-            return _key;
+        inline const blockstore::BlockId &DirEntry::blockId() const {
+            return _blockId;
         }
 
-        inline mode_t DirEntry::mode() const {
+        inline fspp::mode_t DirEntry::mode() const {
             return _mode;
         }
 
-        inline uid_t DirEntry::uid() const {
+        inline fspp::uid_t DirEntry::uid() const {
             return _uid;
         }
 
-        inline gid_t DirEntry::gid() const {
+        inline fspp::gid_t DirEntry::gid() const {
             return _gid;
         }
 
@@ -140,17 +128,17 @@ namespace cryfs {
             _updateLastMetadataChangeTime();
         }
 
-        inline void DirEntry::setMode(mode_t value) {
+        inline void DirEntry::setMode(fspp::mode_t value) {
             _mode = value;
             _updateLastMetadataChangeTime();
         }
 
-        inline void DirEntry::setUid(uid_t value) {
+        inline void DirEntry::setUid(fspp::uid_t value) {
             _uid = value;
             _updateLastMetadataChangeTime();
         }
 
-        inline void DirEntry::setGid(gid_t value) {
+        inline void DirEntry::setGid(fspp::gid_t value) {
             _gid = value;
             _updateLastMetadataChangeTime();
         }

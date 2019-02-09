@@ -2,23 +2,23 @@
 #ifndef MESSMER_FSPP_FSTEST_FSPPDEVICETEST_H_
 #define MESSMER_FSPP_FSTEST_FSPPDEVICETEST_H_
 
-#include <fspp/fuse/FuseErrnoException.h>
+#include "fspp/fs_interface/FuseErrnoException.h"
 
 template<class ConcreteFileSystemTestFixture>
 class FsppDeviceTest: public FileSystemTest<ConcreteFileSystemTestFixture> {
 public:
   void InitDirStructure() {
-    this->LoadDir("/")->createAndOpenFile("myfile", this->MODE_PUBLIC, 0, 0);
-    this->LoadDir("/")->createSymlink("mysymlink", "/symlink/target", 0, 0);
-    this->LoadDir("/")->createDir("mydir", this->MODE_PUBLIC, 0, 0);
-    this->LoadDir("/")->createDir("myemptydir", this->MODE_PUBLIC, 0, 0);
-    this->LoadDir("/mydir")->createAndOpenFile("myfile", this->MODE_PUBLIC, 0, 0);
-    this->LoadDir("/mydir")->createAndOpenFile("myfile2", this->MODE_PUBLIC, 0, 0);
-    this->LoadDir("/mydir")->createSymlink("mysymlink", "/symlink/target", 0, 0);
-    this->LoadDir("/mydir")->createDir("mysubdir", this->MODE_PUBLIC, 0, 0);
-    this->LoadDir("/mydir/mysubdir")->createAndOpenFile("myfile", this->MODE_PUBLIC, 0, 0);
-    this->LoadDir("/mydir/mysubdir")->createSymlink("mysymlink", "/symlink/target", 0, 0);
-    this->LoadDir("/mydir/mysubdir")->createDir("mysubsubdir", this->MODE_PUBLIC, 0, 0);
+    this->LoadDir("/")->createAndOpenFile("myfile", this->MODE_PUBLIC, fspp::uid_t(0), fspp::gid_t(0));
+    this->LoadDir("/")->createSymlink("mysymlink", "/symlink/target", fspp::uid_t(0), fspp::gid_t(0));
+    this->LoadDir("/")->createDir("mydir", this->MODE_PUBLIC, fspp::uid_t(0), fspp::gid_t(0));
+    this->LoadDir("/")->createDir("myemptydir", this->MODE_PUBLIC, fspp::uid_t(0), fspp::gid_t(0));
+    this->LoadDir("/mydir")->createAndOpenFile("myfile", this->MODE_PUBLIC, fspp::uid_t(0), fspp::gid_t(0));
+    this->LoadDir("/mydir")->createAndOpenFile("myfile2", this->MODE_PUBLIC, fspp::uid_t(0), fspp::gid_t(0));
+    this->LoadDir("/mydir")->createSymlink("mysymlink", "/symlink/target", fspp::uid_t(0), fspp::gid_t(0));
+    this->LoadDir("/mydir")->createDir("mysubdir", this->MODE_PUBLIC, fspp::uid_t(0), fspp::gid_t(0));
+    this->LoadDir("/mydir/mysubdir")->createAndOpenFile("myfile", this->MODE_PUBLIC, fspp::uid_t(0), fspp::gid_t(0));
+    this->LoadDir("/mydir/mysubdir")->createSymlink("mysymlink", "/symlink/target", fspp::uid_t(0), fspp::gid_t(0));
+    this->LoadDir("/mydir/mysubdir")->createDir("mysubsubdir", this->MODE_PUBLIC, fspp::uid_t(0), fspp::gid_t(0));
   }
 };
 

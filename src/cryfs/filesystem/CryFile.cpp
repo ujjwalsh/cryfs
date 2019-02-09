@@ -2,15 +2,12 @@
 
 #include "CryDevice.h"
 #include "CryOpenFile.h"
-#include <fspp/fuse/FuseErrnoException.h>
+#include <fspp/fs_interface/FuseErrnoException.h>
 
-namespace bf = boost::filesystem;
 
 //TODO Get rid of this in favor of exception hierarchy
-using fspp::fuse::CHECK_RETVAL;
-using fspp::fuse::FuseErrnoException;
 
-using blockstore::Key;
+using blockstore::BlockId;
 using boost::none;
 using boost::optional;
 using cpputils::unique_ref;
@@ -21,8 +18,8 @@ using cryfs::parallelaccessfsblobstore::FileBlobRef;
 
 namespace cryfs {
 
-CryFile::CryFile(CryDevice *device, unique_ref<DirBlobRef> parent, optional<unique_ref<DirBlobRef>> grandparent, const Key &key)
-: CryNode(device, std::move(parent), std::move(grandparent), key) {
+CryFile::CryFile(CryDevice *device, unique_ref<DirBlobRef> parent, optional<unique_ref<DirBlobRef>> grandparent, const BlockId &blockId)
+: CryNode(device, std::move(parent), std::move(grandparent), blockId) {
 }
 
 CryFile::~CryFile() {
@@ -35,7 +32,7 @@ unique_ref<parallelaccessfsblobstore::FileBlobRef> CryFile::LoadBlob() const {
   return std::move(*file_blob);
 }
 
-unique_ref<fspp::OpenFile> CryFile::open(int flags) {
+unique_ref<fspp::OpenFile> CryFile::open(fspp::openflags_t flags) {
   // TODO Should we honor open flags?
   UNUSED(flags);
   device()->callFsActionCallbacks();
@@ -43,11 +40,11 @@ unique_ref<fspp::OpenFile> CryFile::open(int flags) {
   return make_unique_ref<CryOpenFile>(device(), parent(), std::move(blob));
 }
 
-void CryFile::truncate(off_t size) {
+void CryFile::truncate(fspp::num_bytes_t size) {
   device()->callFsActionCallbacks();
-  auto blob = LoadBlob();
+  auto blob = LoadBlob(); // NOLINT (workaround https://gcc.gnu.org/bugzilla/show_bug.cgi?id=82481 )
   blob->resize(size);
-  parent()->updateModificationTimestampForChild(key());
+  parent()->updateModificationTimestampForChild(blockId());
 }
 
 fspp::Dir::EntryType CryFile::getType() const {
@@ -59,7 +56,7 @@ void CryFile::remove() {
   device()->callFsActionCallbacks();
   if (grandparent() != none) {
     //TODO Instead of doing nothing when we're in the root directory, handle timestamps in the root dir correctly
-    (*grandparent())->updateModificationTimestampForChild(parent()->key());
+    (*grandparent())->updateModificationTimestampForChild(parent()->blockId());
   }
   removeNode();
 }

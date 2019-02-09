@@ -53,7 +53,6 @@ set(SOURCES
     fuse/statfs/FuseStatfsReturnBsizeTest.cpp
     fuse/statfs/FuseStatfsErrorTest.cpp
     fuse/statfs/FuseStatfsReturnBfreeTest.cpp
-    fuse/statfs/FuseStatfsPathParameterTest.cpp
     fuse/statfs/FuseStatfsReturnBlocksTest.cpp
     fuse/statfs/FuseStatfsReturnBavailTest.cpp
     fuse/closeFile/FuseCloseTest.cpp
@@ -100,10 +99,10 @@ set(SOURCES
     fs_interface/DirTest.cpp
     fs_interface/DeviceTest.cpp
     fs_interface/OpenFileTest.cpp
-)
+        testutils/OpenFileHandle.cpp testutils/OpenFileHandle.h)
 
 add_executable(${PROJECT_NAME} ${SOURCES})
-target_link_libraries(${PROJECT_NAME} googletest fspp)
+target_link_libraries(${PROJECT_NAME} googletest fspp-interface fspp-fuse)
 add_test(${PROJECT_NAME} ${PROJECT_NAME})
 
 target_enable_style_warnings(${PROJECT_NAME})

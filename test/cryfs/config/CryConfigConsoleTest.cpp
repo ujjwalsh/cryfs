@@ -10,17 +10,13 @@ using namespace cryfs;
 
 using boost::optional;
 using boost::none;
-using cpputils::Console;
 using cpputils::NoninteractiveConsole;
-using cpputils::unique_ref;
-using cpputils::make_unique_ref;
 using std::string;
-using std::vector;
 using std::shared_ptr;
 using std::make_shared;
 using ::testing::_;
+using ::testing::NiceMock;
 using ::testing::Return;
-using ::testing::Invoke;
 using ::testing::ValuesIn;
 using ::testing::HasSubstr;
 using ::testing::UnorderedElementsAreArray;
@@ -29,11 +25,11 @@ using ::testing::WithParamInterface;
 class CryConfigConsoleTest: public ::testing::Test {
 public:
     CryConfigConsoleTest()
-            : console(make_shared<MockConsole>()),
+            : console(make_shared<NiceMock<MockConsole>>()),
               cryconsole(console),
               noninteractiveCryconsole(make_shared<NoninteractiveConsole>(console)) {
     }
-    shared_ptr<MockConsole> console;
+    shared_ptr<NiceMock<MockConsole>> console;
     CryConfigConsole cryconsole;
     CryConfigConsole noninteractiveCryconsole;
 };
@@ -47,6 +43,10 @@ class CryConfigConsoleTest_Cipher: public CryConfigConsoleTest {};
 #define EXPECT_ASK_FOR_BLOCKSIZE()                                                                                     \
   EXPECT_CALL(*console, askYesNo("Use default settings?", _)).Times(1).WillOnce(Return(false));                        \
   EXPECT_CALL(*console, ask(HasSubstr("block size"), _)).Times(1)
+
+#define EXPECT_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION()                                                              \
+  EXPECT_CALL(*console, askYesNo("Use default settings?", _)).Times(1).WillOnce(Return(false));                        \
+  EXPECT_CALL(*console, askYesNo(HasSubstr("missing block"), _)).Times(1)
 
 TEST_F(CryConfigConsoleTest_Cipher, AsksForCipher) {
     EXPECT_ASK_FOR_CIPHER().WillOnce(ChooseAnyCipher());
@@ -70,6 +70,11 @@ TEST_F(CryConfigConsoleTest_Cipher, ChooseDefaultCipherWhenNoninteractiveEnviron
 TEST_F(CryConfigConsoleTest_Cipher, AsksForBlocksize) {
     EXPECT_ASK_FOR_BLOCKSIZE().WillOnce(Return(0));
     cryconsole.askBlocksizeBytes();
+}
+
+TEST_F(CryConfigConsoleTest_Cipher, AsksForMissingBlockIsIntegrityViolation) {
+    EXPECT_ASK_FOR_MISSINGBLOCKISINTEGRITYVIOLATION().WillOnce(Return(true));
+    cryconsole.askMissingBlockIsIntegrityViolation();
 }
 
 TEST_F(CryConfigConsoleTest_Cipher, ChooseDefaultBlocksizeWhenNoninteractiveEnvironment) {

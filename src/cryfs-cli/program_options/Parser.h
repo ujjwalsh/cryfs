@@ -1,11 +1,12 @@
 #pragma once
-#ifndef MESSMER_CRYFS_PROGRAMOPTIONS_PARSER_H
-#define MESSMER_CRYFS_PROGRAMOPTIONS_PARSER_H
+#ifndef MESSMER_CRYFSCLI_PROGRAMOPTIONS_PARSER_H
+#define MESSMER_CRYFSCLI_PROGRAMOPTIONS_PARSER_H
 
 #include "ProgramOptions.h"
 #include <boost/program_options.hpp>
+#include <cryfs/ErrorCodes.h>
 
-namespace cryfs {
+namespace cryfs_cli {
     namespace program_options {
         class Parser final {
         public:
@@ -19,8 +20,10 @@ namespace cryfs {
             static void _addAllowedOptions(boost::program_options::options_description *desc);
             static void _addPositionalOptionForBaseDir(boost::program_options::options_description *desc,
                                                        boost::program_options::positional_options_description *positional);
-            [[noreturn]] static void _showHelpAndExit();
+            static void _showHelp();
+            [[noreturn]] static void _showHelpAndExit(const std::string& message, cryfs::ErrorCode errorCode);
             [[noreturn]] static void _showCiphersAndExit(const std::vector<std::string> &supportedCiphers);
+            [[noreturn]] static void _showVersionAndExit();
             static boost::program_options::variables_map _parseOptionsOrShowHelp(const std::vector<std::string> &options, const std::vector<std::string> &supportedCiphers);
             static boost::program_options::variables_map _parseOptions(const std::vector<std::string> &options, const std::vector<std::string> &supportedCiphers);
             static void _checkValidCipher(const std::string &cipher, const std::vector<std::string> &supportedCiphers);

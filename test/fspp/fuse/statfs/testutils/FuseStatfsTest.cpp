@@ -1,17 +1,16 @@
 #include "FuseStatfsTest.h"
 
 using std::function;
-using ::testing::StrEq;
 using ::testing::_;
 using ::testing::Invoke;
 
 void FuseStatfsTest::Statfs(const std::string &path) {
-  struct ::statvfs dummy;
+  struct ::statvfs dummy{};
   Statfs(path, &dummy);
 }
 
 int FuseStatfsTest::StatfsReturnError(const std::string &path) {
-  struct ::statvfs dummy;
+  struct ::statvfs dummy{};
   return StatfsReturnError(path, &dummy);
 }
 
@@ -24,7 +23,7 @@ int FuseStatfsTest::StatfsReturnError(const std::string &path, struct ::statvfs 
   auto fs = TestFS();
 
   auto realpath = fs->mountDir() / path;
-  int retval = ::statvfs(realpath.c_str(), result);
+  int retval = ::statvfs(realpath.string().c_str(), result);
   if (retval == 0) {
     return 0;
   } else {
@@ -34,11 +33,11 @@ int FuseStatfsTest::StatfsReturnError(const std::string &path, struct ::statvfs 
 
 struct ::statvfs FuseStatfsTest::CallStatfsWithImpl(function<void(struct ::statvfs*)> implementation) {
   ReturnIsFileOnLstat(FILENAME);
-  EXPECT_CALL(fsimpl, statfs(StrEq(FILENAME), _)).WillRepeatedly(Invoke([implementation](const char*, struct ::statvfs *stat) {
+  EXPECT_CALL(*fsimpl, statfs(_)).WillRepeatedly(Invoke([implementation](struct ::statvfs *stat) {
     implementation(stat);
   }));
 
-  struct ::statvfs result;
+  struct ::statvfs result{};
   Statfs(FILENAME, &result);
 
   return result;

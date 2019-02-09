@@ -11,322 +11,313 @@
 #include <cpp-utils/pointer/optional_ownership_ptr.h>
 #include <cmath>
 #include <cpp-utils/assert/assert.h>
+#include "impl/LeafTraverser.h"
+#include <boost/thread.hpp>
+#include <blobstore/implementations/onblocks/utils/Math.h>
 
-using blockstore::Key;
+using blockstore::BlockId;
 using blobstore::onblocks::datanodestore::DataNodeStore;
 using blobstore::onblocks::datanodestore::DataNode;
 using blobstore::onblocks::datanodestore::DataInnerNode;
 using blobstore::onblocks::datanodestore::DataLeafNode;
-using blobstore::onblocks::datanodestore::DataNodeLayout;
 
-using std::dynamic_pointer_cast;
 using std::function;
 using boost::shared_mutex;
 using boost::shared_lock;
 using boost::unique_lock;
 using boost::none;
-using std::vector;
+using boost::optional;
 
-using cpputils::dynamic_pointer_move;
 using cpputils::optional_ownership_ptr;
-using cpputils::WithOwnership;
-using cpputils::WithoutOwnership;
 using cpputils::unique_ref;
+using cpputils::Data;
+using namespace cpputils::logging;
+
+//TODO shared_lock currently not enough for traverse because of root replacement. Can be fixed while keeping shared?
 
 namespace blobstore {
 namespace onblocks {
 namespace datatreestore {
 
 DataTree::DataTree(DataNodeStore *nodeStore, unique_ref<DataNode> rootNode)
-  : _mutex(), _nodeStore(nodeStore), _rootNode(std::move(rootNode)) {
+  : _treeStructureMutex(), _nodeStore(nodeStore), _rootNode(std::move(rootNode)), _blockId(_rootNode->blockId()), _sizeCache() {
 }
 
 DataTree::~DataTree() {
 }
 
-void DataTree::removeLastDataLeaf() {
-  auto deletePosOrNull = algorithms::GetLowestRightBorderNodeWithMoreThanOneChildOrNull(_nodeStore, _rootNode.get());
-  ASSERT(deletePosOrNull.get() != nullptr, "Tree has only one leaf, can't shrink it.");
-
-  deleteLastChildSubtree(deletePosOrNull.get());
-
-  ifRootHasOnlyOneChildReplaceRootWithItsChild();
-}
-
-void DataTree::ifRootHasOnlyOneChildReplaceRootWithItsChild() {
-  DataInnerNode *rootNode = dynamic_cast<DataInnerNode*>(_rootNode.get());
-  ASSERT(rootNode != nullptr, "RootNode is not an inner node");
-  if (rootNode->numChildren() == 1) {
-    auto child = _nodeStore->load(rootNode->getChild(0)->key());
-    ASSERT(child != none, "Couldn't load first child of root node");
-    _rootNode = _nodeStore->overwriteNodeWith(std::move(_rootNode), **child);
-    _nodeStore->remove(std::move(*child));
-  }
-}
-
-void DataTree::deleteLastChildSubtree(DataInnerNode *node) {
-  auto lastChild = _nodeStore->load(node->LastChild()->key());
-  ASSERT(lastChild != none, "Couldn't load last child");
-  _nodeStore->removeSubtree(std::move(*lastChild));
-  node->removeLastChild();
-}
-
-unique_ref<DataLeafNode> DataTree::addDataLeaf() {
-  auto insertPosOrNull = algorithms::GetLowestInnerRightBorderNodeWithLessThanKChildrenOrNull(_nodeStore, _rootNode.get());
-  if (insertPosOrNull) {
-    return addDataLeafAt(insertPosOrNull.get());
-  } else {
-    return addDataLeafToFullTree();
-  }
-}
-
-unique_ref<DataLeafNode> DataTree::addDataLeafAt(DataInnerNode *insertPos) {
-  auto new_leaf = _nodeStore->createNewLeafNode();
-  auto chain = createChainOfInnerNodes(insertPos->depth()-1, new_leaf.get());
-  insertPos->addChild(*chain);
-  return new_leaf;
-}
-
-optional_ownership_ptr<DataNode> DataTree::createChainOfInnerNodes(unsigned int num, DataNode *child) {
-  //TODO This function is implemented twice, once with optional_ownership_ptr, once with unique_ref. Redundancy!
-  optional_ownership_ptr<DataNode> chain = cpputils::WithoutOwnership<DataNode>(child);
-  for(unsigned int i=0; i<num; ++i) {
-    auto newnode = _nodeStore->createNewInnerNode(*chain);
-    chain = cpputils::WithOwnership<DataNode>(std::move(newnode));
-  }
-  return chain;
-}
-
-unique_ref<DataNode> DataTree::createChainOfInnerNodes(unsigned int num, unique_ref<DataNode> child) {
-  unique_ref<DataNode> chain = std::move(child);
-  for(unsigned int i=0; i<num; ++i) {
-    chain = _nodeStore->createNewInnerNode(*chain);
-  }
-  return chain;
-}
-
-DataInnerNode* DataTree::increaseTreeDepth(unsigned int levels) {
-  ASSERT(levels >= 1, "Parameter out of bounds: tried to increase tree depth by zero.");
-  auto copyOfOldRoot = _nodeStore->createNewNodeAsCopyFrom(*_rootNode);
-  auto chain = createChainOfInnerNodes(levels-1, copyOfOldRoot.get());
-  auto newRootNode = DataNode::convertToNewInnerNode(std::move(_rootNode), *chain);
-  DataInnerNode *result = newRootNode.get();
-  _rootNode = std::move(newRootNode);
-  return result;
-}
-
-unique_ref<DataLeafNode> DataTree::addDataLeafToFullTree() {
-  DataInnerNode *rootNode = increaseTreeDepth(1);
-  auto newLeaf = addDataLeafAt(rootNode);
-  return newLeaf;
-}
-
-const Key &DataTree::key() const {
-  return _rootNode->key();
+const BlockId &DataTree::blockId() const {
+  return _blockId;
 }
 
 void DataTree::flush() const {
-  // By grabbing a lock, we ensure that all modifying functions don't run currently and are therefore flushed
-  unique_lock<shared_mutex> lock(_mutex);
+  // By grabbing a lock, we ensure that all modifying functions don't run currently and are therefore flushed.
+  // It's only a shared lock, because this doesn't modify the tree structure.
+  shared_lock<shared_mutex> lock(_treeStructureMutex);
   // We also have to flush the root node
   _rootNode->flush();
 }
 
 unique_ref<DataNode> DataTree::releaseRootNode() {
+  // Lock also ensures that the root node is currently set (traversing unsets it temporarily)
+  // It's a unique lock because this "modifies" tree structure by changing _rootNode.
+  unique_lock<shared_mutex> lock(_treeStructureMutex);
   return std::move(_rootNode);
 }
 
-//TODO Test numLeaves(), for example also two configurations with same number of bytes but different number of leaves (last leaf has 0 bytes)
-uint32_t DataTree::numLeaves() const {
-  shared_lock<shared_mutex> lock(_mutex);
-  return _numLeaves(*_rootNode);
+uint32_t DataTree::numNodes() const {
+  uint32_t numNodesCurrentLevel = numLeaves();
+  uint32_t totalNumNodes = numNodesCurrentLevel;
+  for(size_t level = 0; level < _rootNode->depth(); ++level) {
+    numNodesCurrentLevel = blobstore::onblocks::utils::ceilDivision(numNodesCurrentLevel, static_cast<uint32_t>(_nodeStore->layout().maxChildrenPerInnerNode()));
+    totalNumNodes += numNodesCurrentLevel;
+  }
+  return totalNumNodes;
 }
 
-uint32_t DataTree::_numLeaves(const DataNode &node) const {
+uint32_t DataTree::numLeaves() const {
+  shared_lock<shared_mutex> lock(_treeStructureMutex);
+
+  return _getOrComputeSizeCache().numLeaves;
+}
+
+uint64_t DataTree::numBytes() const {
+  shared_lock<shared_mutex> lock(_treeStructureMutex);
+  return _numBytes();
+}
+
+uint64_t DataTree::_numBytes() const {
+  return _getOrComputeSizeCache().numBytes;
+}
+
+DataTree::SizeCache DataTree::_getOrComputeSizeCache() const {
+  return _sizeCache.getOrCompute([this] () {
+    return _computeSizeCache(*_rootNode);
+  });
+}
+
+uint32_t DataTree::forceComputeNumLeaves() const {
+  _sizeCache.clear();
+  return numLeaves();
+}
+
+DataTree::SizeCache DataTree::_computeSizeCache(const DataNode &node) const {
   const DataLeafNode *leaf = dynamic_cast<const DataLeafNode*>(&node);
   if (leaf != nullptr) {
-    return 1;
+    return {1, leaf->numBytes()};
   }
 
   const DataInnerNode &inner = dynamic_cast<const DataInnerNode&>(node);
-  uint64_t numLeavesInLeftChildren = (uint64_t)(inner.numChildren()-1) * leavesPerFullChild(inner);
-  auto lastChild = _nodeStore->load(inner.LastChild()->key());
+  uint32_t numLeavesInLeftChildren = static_cast<uint32_t>(inner.numChildren()-1) * _leavesPerFullChild(inner);
+  uint64_t numBytesInLeftChildren = numLeavesInLeftChildren * _nodeStore->layout().maxBytesPerLeaf();
+  auto lastChild = _nodeStore->load(inner.readLastChild().blockId());
   ASSERT(lastChild != none, "Couldn't load last child");
-  uint64_t numLeavesInRightChild = _numLeaves(**lastChild);
+  SizeCache sizeInRightChild = _computeSizeCache(**lastChild);
 
-  return numLeavesInLeftChildren + numLeavesInRightChild;
+  return SizeCache {
+    numLeavesInLeftChildren + sizeInRightChild.numLeaves,
+    numBytesInLeftChildren + sizeInRightChild.numBytes
+  };
 }
 
-void DataTree::traverseLeaves(uint32_t beginIndex, uint32_t endIndex, function<void (DataLeafNode*, uint32_t)> func) {
-  //TODO Can we traverse in parallel?
-  unique_lock<shared_mutex> lock(_mutex); //TODO Only lock when resizing. Otherwise parallel read/write to a blob is not possible!
-  ASSERT(beginIndex <= endIndex, "Invalid parameters");
-  if (0 == endIndex) {
-    // In this case the utils::ceilLog(_, endIndex) below would fail
+void DataTree::_traverseLeavesByLeafIndices(uint32_t beginIndex, uint32_t endIndex, bool readOnlyTraversal,
+    function<void (uint32_t index, bool isRightBorderLeaf, LeafHandle leaf)> onExistingLeaf,
+    function<Data (uint32_t index)> onCreateLeaf,
+    function<void (DataInnerNode *node)> onBacktrackFromSubtree) const {
+  if(endIndex <= beginIndex) {
     return;
   }
 
-  uint8_t neededTreeDepth = utils::ceilLog(_nodeStore->layout().maxChildrenPerInnerNode(), (uint64_t)endIndex);
-  uint32_t numLeaves = this->_numLeaves(*_rootNode); // TODO Querying the size causes a tree traversal down to the leaves. Possible without querying the size?
-  if (_rootNode->depth() < neededTreeDepth) {
-    //TODO Test cases that actually increase it here by 0 level / 1 level / more than 1 level
-    increaseTreeDepth(neededTreeDepth - _rootNode->depth());
-  }
-
-  if (numLeaves <= beginIndex) {
-    //TODO Test cases with numLeaves < / >= beginIndex
-    // There is a gap between the current size and the begin of the traversal
-    return _traverseLeaves(_rootNode.get(), 0, numLeaves-1, endIndex, [beginIndex, numLeaves, &func, this](DataLeafNode* node, uint32_t index) {
-      if (index >= beginIndex) {
-        func(node, index);
-      } else if (index == numLeaves - 1) {
-        // It is the old last leaf - resize it to maximum
-        node->resize(_nodeStore->layout().maxBytesPerLeaf());
-      }
-    });
-  } else if (numLeaves < endIndex) {
-    // We are starting traversal in the valid region, but traverse until after it (we grow new leaves)
-    return _traverseLeaves(_rootNode.get(), 0, beginIndex, endIndex, [numLeaves, &func, this] (DataLeafNode *node, uint32_t index) {
-      if (index == numLeaves - 1) {
-        // It is the old last leaf  - resize it to maximum
-        node->resize(_nodeStore->layout().maxBytesPerLeaf());
-      }
-      func(node, index);
-    });
-  } else {
-    //We are traversing entirely inside the valid region
-    _traverseLeaves(_rootNode.get(), 0, beginIndex, endIndex, func);
-  }
+  // TODO no const cast
+  LeafTraverser(_nodeStore, readOnlyTraversal).traverseAndUpdateRoot(&const_cast<DataTree*>(this)->_rootNode, beginIndex, endIndex, onExistingLeaf, onCreateLeaf, onBacktrackFromSubtree);
 }
 
-void DataTree::_traverseLeaves(DataNode *root, uint32_t leafOffset, uint32_t beginIndex, uint32_t endIndex, function<void (DataLeafNode*, uint32_t)> func) {
-  DataLeafNode *leaf = dynamic_cast<DataLeafNode*>(root);
-  if (leaf != nullptr) {
-    ASSERT(beginIndex <= 1 && endIndex <= 1, "If root node is a leaf, the (sub)tree has only one leaf - access indices must be 0 or 1.");
-    if (beginIndex == 0 && endIndex == 1) {
-      func(leaf, leafOffset);
+void DataTree::_traverseLeavesByByteIndices(uint64_t beginByte, uint64_t sizeBytes, bool readOnlyTraversal, function<void (uint64_t leafOffset, LeafHandle leaf, uint32_t begin, uint32_t count)> onExistingLeaf, function<Data (uint64_t beginByte, uint32_t count)> onCreateLeaf) const {
+  if (sizeBytes == 0) {
+    return;
+  }
+
+  uint64_t endByte = beginByte + sizeBytes;
+  uint64_t _maxBytesPerLeaf = maxBytesPerLeaf();
+  uint32_t firstLeaf = beginByte / _maxBytesPerLeaf;
+  uint32_t endLeaf = utils::ceilDivision(endByte, _maxBytesPerLeaf);
+  bool blobIsGrowingFromThisTraversal = false;
+  auto _onExistingLeaf = [&onExistingLeaf, beginByte, endByte, endLeaf, _maxBytesPerLeaf, &blobIsGrowingFromThisTraversal] (uint32_t leafIndex, bool isRightBorderLeaf, LeafHandle leafHandle) {
+    uint64_t indexOfFirstLeafByte = leafIndex * _maxBytesPerLeaf;
+    ASSERT(endByte > indexOfFirstLeafByte, "Traversal went too far right");
+    uint32_t dataBegin = utils::maxZeroSubtraction(beginByte, indexOfFirstLeafByte);
+    uint32_t dataEnd = std::min(_maxBytesPerLeaf, endByte - indexOfFirstLeafByte);
+    // If we are traversing exactly until the last leaf, then the last leaf wasn't resized by the traversal and might have a wrong size. We have to fix it.
+    if (isRightBorderLeaf) {
+      ASSERT(leafIndex == endLeaf-1, "If we traversed further right, this wouldn't be the right border leaf.");
+      auto leaf = leafHandle.node();
+      if (leaf->numBytes() < dataEnd) {
+        leaf->resize(dataEnd);
+        blobIsGrowingFromThisTraversal = true;
+      }
     }
-    return;
+    onExistingLeaf(indexOfFirstLeafByte, std::move(leafHandle), dataBegin, dataEnd-dataBegin);
+  };
+  auto _onCreateLeaf = [&onCreateLeaf, _maxBytesPerLeaf, beginByte, firstLeaf, endByte, endLeaf, &blobIsGrowingFromThisTraversal, readOnlyTraversal] (uint32_t leafIndex) -> Data {
+    ASSERT(!readOnlyTraversal, "Cannot create leaves in a read-only traversal");
+    blobIsGrowingFromThisTraversal = true;
+    uint64_t indexOfFirstLeafByte = leafIndex * _maxBytesPerLeaf;
+    ASSERT(endByte > indexOfFirstLeafByte, "Traversal went too far right");
+    uint32_t dataBegin = utils::maxZeroSubtraction(beginByte, indexOfFirstLeafByte);
+    uint32_t dataEnd = std::min(_maxBytesPerLeaf, endByte - indexOfFirstLeafByte);
+    ASSERT(leafIndex == firstLeaf || dataBegin == 0, "Only the leftmost leaf can have a gap on the left.");
+    ASSERT(leafIndex == endLeaf-1 || dataEnd == _maxBytesPerLeaf, "Only the rightmost leaf can have a gap on the right");
+    Data data = onCreateLeaf(indexOfFirstLeafByte + dataBegin, dataEnd-dataBegin);
+    ASSERT(data.size() == dataEnd-dataBegin, "Returned leaf data with wrong size");
+    // If this leaf is created but only partly in the traversed region (i.e. dataBegin > leafBegin), we have to fill the data before the traversed region with zeroes.
+    if (dataBegin != 0) {
+      Data actualData(dataBegin + data.size());
+      std::memset(actualData.data(), 0, dataBegin);
+      std::memcpy(actualData.dataOffset(dataBegin), data.data(), data.size());
+      data = std::move(actualData);
+    }
+    return data;
+  };
+  auto _onBacktrackFromSubtree = [] (DataInnerNode* /*node*/) {};
+
+  _traverseLeavesByLeafIndices(firstLeaf, endLeaf, readOnlyTraversal, _onExistingLeaf, _onCreateLeaf, _onBacktrackFromSubtree);
+
+  ASSERT(!readOnlyTraversal || !blobIsGrowingFromThisTraversal, "Blob grew from traversal that didn't allow growing (i.e. reading)");
+
+  if (blobIsGrowingFromThisTraversal) {
+    _sizeCache.update([endLeaf, endByte] (optional<SizeCache>* cache) {
+        *cache = SizeCache{endLeaf, endByte};
+    });
   }
-
-  DataInnerNode *inner = dynamic_cast<DataInnerNode*>(root);
-  uint32_t leavesPerChild = leavesPerFullChild(*inner);
-  uint32_t beginChild = beginIndex/leavesPerChild;
-  uint32_t endChild = utils::ceilDivision(endIndex, leavesPerChild);
-  vector<unique_ref<DataNode>> children = getOrCreateChildren(inner, beginChild, endChild);
-
-  for (uint32_t childIndex = beginChild; childIndex < endChild; ++childIndex) {
-    uint32_t childOffset = childIndex * leavesPerChild;
-    uint32_t localBeginIndex = utils::maxZeroSubtraction(beginIndex, childOffset);
-    uint32_t localEndIndex = std::min(leavesPerChild, endIndex - childOffset);
-    auto child = std::move(children[childIndex-beginChild]);
-    _traverseLeaves(child.get(), leafOffset + childOffset, localBeginIndex, localEndIndex, func);
-  }
 }
 
-vector<unique_ref<DataNode>> DataTree::getOrCreateChildren(DataInnerNode *node, uint32_t begin, uint32_t end) {
-  vector<unique_ref<DataNode>> children;
-  children.reserve(end-begin);
-  for (uint32_t childIndex = begin; childIndex < std::min(node->numChildren(), end); ++childIndex) {
-    auto child = _nodeStore->load(node->getChild(childIndex)->key());
-    ASSERT(child != none, "Couldn't load child node");
-    children.emplace_back(std::move(*child));
-  }
-  for (uint32_t childIndex = node->numChildren(); childIndex < end; ++childIndex) {
-    //TODO This creates each child with one chain to one leaf only, and then on the next lower level it
-    //     has to create the children for the child. Would be faster to directly create full trees if necessary.
-    children.emplace_back(addChildTo(node));
-  }
-  ASSERT(children.size() == end-begin, "Number of children in the result is wrong");
-  return children;
-}
-
-unique_ref<DataNode> DataTree::addChildTo(DataInnerNode *node) {
-  auto new_leaf = _nodeStore->createNewLeafNode();
-  new_leaf->resize(_nodeStore->layout().maxBytesPerLeaf());
-  auto chain = createChainOfInnerNodes(node->depth()-1, std::move(new_leaf));
-  node->addChild(*chain);
-  return chain;
-}
-
-uint32_t DataTree::leavesPerFullChild(const DataInnerNode &root) const {
-  return utils::intPow(_nodeStore->layout().maxChildrenPerInnerNode(), (uint64_t)root.depth()-1);
-}
-
-uint64_t DataTree::numStoredBytes() const {
-  shared_lock<shared_mutex> lock(_mutex);
-  return _numStoredBytes();
-}
-
-uint64_t DataTree::_numStoredBytes() const {
-  return _numStoredBytes(*_rootNode);
-}
-
-uint64_t DataTree::_numStoredBytes(const DataNode &root) const {
-  const DataLeafNode *leaf = dynamic_cast<const DataLeafNode*>(&root);
-  if (leaf != nullptr) {
-    return leaf->numBytes();
-  }
-
-  const DataInnerNode &inner = dynamic_cast<const DataInnerNode&>(root);
-  uint64_t numBytesInLeftChildren = (inner.numChildren()-1) * leavesPerFullChild(inner) * _nodeStore->layout().maxBytesPerLeaf();
-  auto lastChild = _nodeStore->load(inner.LastChild()->key());
-  ASSERT(lastChild != none, "Couldn't load last child");
-  uint64_t numBytesInRightChild = _numStoredBytes(**lastChild);
-
-  return numBytesInLeftChildren + numBytesInRightChild;
+uint32_t DataTree::_leavesPerFullChild(const DataInnerNode &root) const {
+  return utils::intPow(_nodeStore->layout().maxChildrenPerInnerNode(), static_cast<uint64_t>(root.depth())-1);
 }
 
 void DataTree::resizeNumBytes(uint64_t newNumBytes) {
-  //TODO Can we resize in parallel? Especially creating new blocks (i.e. encrypting them) is expensive and should be done in parallel.
-  boost::upgrade_lock<shared_mutex> lock(_mutex);
-  {
-    boost::upgrade_to_unique_lock<shared_mutex> exclusiveLock(lock);
-    //TODO Faster implementation possible (no addDataLeaf()/removeLastDataLeaf() in a loop, but directly resizing)
-    LastLeaf(_rootNode.get())->resize(_nodeStore->layout().maxBytesPerLeaf());
-    uint64_t currentNumBytes = _numStoredBytes();
-    ASSERT(currentNumBytes % _nodeStore->layout().maxBytesPerLeaf() == 0, "The last leaf is not a max data leaf, although we just resized it to be one.");
-    uint32_t currentNumLeaves = currentNumBytes / _nodeStore->layout().maxBytesPerLeaf();
-    uint32_t newNumLeaves = std::max(UINT64_C(1), utils::ceilDivision(newNumBytes, _nodeStore->layout().maxBytesPerLeaf()));
+  std::unique_lock<shared_mutex> lock(_treeStructureMutex);
 
-    for(uint32_t i = currentNumLeaves; i < newNumLeaves; ++i) {
-      addDataLeaf()->resize(_nodeStore->layout().maxBytesPerLeaf());
-    }
-    for(uint32_t i = currentNumLeaves; i > newNumLeaves; --i) {
-      removeLastDataLeaf();
-    }
-    uint32_t newLastLeafSize = newNumBytes - (newNumLeaves-1)*_nodeStore->layout().maxBytesPerLeaf();
-    LastLeaf(_rootNode.get())->resize(newLastLeafSize);
-  }
-  ASSERT(newNumBytes == _numStoredBytes(), "We resized to the wrong number of bytes ("+std::to_string(numStoredBytes())+" instead of "+std::to_string(newNumBytes)+")");
-}
+  uint32_t newNumLeaves = std::max(UINT64_C(1), utils::ceilDivision(newNumBytes, _nodeStore->layout().maxBytesPerLeaf()));
+  uint32_t newLastLeafSize = newNumBytes - (newNumLeaves-1) * _nodeStore->layout().maxBytesPerLeaf();
+  uint32_t maxChildrenPerInnerNode = _nodeStore->layout().maxChildrenPerInnerNode();
+  auto onExistingLeaf = [newLastLeafSize] (uint32_t /*index*/, bool /*isRightBorderLeaf*/, LeafHandle leafHandle) {
+      auto leaf = leafHandle.node();
+      // This is only called, if the new last leaf was already existing
+      if (leaf->numBytes() != newLastLeafSize) {
+        leaf->resize(newLastLeafSize);
+      }
+  };
+  auto onCreateLeaf = [newLastLeafSize] (uint32_t /*index*/) -> Data {
+      // This is only called, if the new last leaf was not existing yet
+      return Data(newLastLeafSize).FillWithZeroes();
+  };
+  auto onBacktrackFromSubtree = [this, newNumLeaves, maxChildrenPerInnerNode] (DataInnerNode* node) {
+      // This is only called for the right border nodes of the new tree.
+      // When growing size, the following is a no-op. When shrinking, we're deleting the children that aren't needed anymore.
+      uint32_t maxLeavesPerChild = utils::intPow(static_cast<uint64_t>(maxChildrenPerInnerNode), (static_cast<uint64_t>(node->depth())-1));
+      uint32_t neededNodesOnChildLevel = utils::ceilDivision(newNumLeaves, maxLeavesPerChild);
+      uint32_t neededSiblings = utils::ceilDivision(neededNodesOnChildLevel, maxChildrenPerInnerNode);
+      uint32_t neededChildrenForRightBorderNode = neededNodesOnChildLevel - (neededSiblings-1) * maxChildrenPerInnerNode;
+      ASSERT(neededChildrenForRightBorderNode <= node->numChildren(), "Node has too few children");
+      // All children to the right of the new right-border-node are removed including their subtree.
+      while(node->numChildren() > neededChildrenForRightBorderNode) {
+        _nodeStore->removeSubtree(node->depth()-1, node->readLastChild().blockId());
+        node->removeLastChild();
+      }
+  };
 
-optional_ownership_ptr<DataLeafNode> DataTree::LastLeaf(DataNode *root) {
-  DataLeafNode *leaf = dynamic_cast<DataLeafNode*>(root);
-  if (leaf != nullptr) {
-    return WithoutOwnership(leaf);
-  }
+  _traverseLeavesByLeafIndices(newNumLeaves - 1, newNumLeaves, false, onExistingLeaf, onCreateLeaf, onBacktrackFromSubtree);
+  _sizeCache.update([newNumLeaves, newNumBytes] (boost::optional<SizeCache>* cache) {
+    *cache = SizeCache{newNumLeaves, newNumBytes};
+  });
 
-  DataInnerNode *inner = dynamic_cast<DataInnerNode*>(root);
-  auto lastChild = _nodeStore->load(inner->LastChild()->key());
-  ASSERT(lastChild != none, "Couldn't load last child");
-  return WithOwnership(LastLeaf(std::move(*lastChild)));
-}
-
-unique_ref<DataLeafNode> DataTree::LastLeaf(unique_ref<DataNode> root) {
-  auto leaf = dynamic_pointer_move<DataLeafNode>(root);
-  if (leaf != none) {
-    return std::move(*leaf);
-  }
-  auto inner = dynamic_pointer_move<DataInnerNode>(root);
-  ASSERT(inner != none, "Root node is neither a leaf nor an inner node");
-  auto child = _nodeStore->load((*inner)->LastChild()->key());
-  ASSERT(child != none, "Couldn't load last child");
-  return LastLeaf(std::move(*child));
 }
 
 uint64_t DataTree::maxBytesPerLeaf() const {
   return _nodeStore->layout().maxBytesPerLeaf();
+}
+
+uint8_t DataTree::depth() const {
+  shared_lock<shared_mutex> lock(_treeStructureMutex);
+  return _rootNode->depth();
+}
+
+void DataTree::readBytes(void *target, uint64_t offset, uint64_t count) const {
+  shared_lock<shared_mutex> lock(_treeStructureMutex);
+
+  const uint64_t _size = _numBytes();
+  if(offset > _size || offset + count > _size) {
+    throw std::runtime_error("BlobOnBlocks::read() read outside blob. Use BlobOnBlocks::tryRead() if this should be allowed.");
+  }
+  const uint64_t read = _tryReadBytes(target, offset, count);
+  if (read != count) {
+    throw std::runtime_error("BlobOnBlocks::read() couldn't read all requested bytes. Use BlobOnBlocks::tryRead() if this should be allowed.");
+  }
+}
+
+Data DataTree::readAllBytes() const {
+  shared_lock<shared_mutex> lock(_treeStructureMutex);
+
+  //TODO Querying numBytes can be inefficient. Is this possible without a call to size()?
+  uint64_t count = _numBytes();
+  Data result(count);
+  _doReadBytes(result.data(), 0, count);
+
+  return result;
+}
+
+uint64_t DataTree::tryReadBytes(void *target, uint64_t offset, uint64_t count) const {
+  shared_lock<shared_mutex> lock(_treeStructureMutex);
+  auto result = _tryReadBytes(target, offset, count);
+  return result;
+}
+
+uint64_t DataTree::_tryReadBytes(void *target, uint64_t offset, uint64_t count) const {
+  //TODO Quite inefficient to call size() here, because that has to traverse the tree
+  const uint64_t _size = _numBytes();
+  const uint64_t realCount = std::max(INT64_C(0), std::min(static_cast<int64_t>(count), static_cast<int64_t>(_size)-static_cast<int64_t>(offset)));
+  _doReadBytes(target, offset, realCount);
+  return realCount;
+}
+
+void DataTree::_doReadBytes(void *target, uint64_t offset, uint64_t count) const {
+  auto onExistingLeaf = [target, offset, count] (uint64_t indexOfFirstLeafByte, LeafHandle leaf, uint32_t leafDataOffset, uint32_t leafDataSize) {
+    ASSERT(indexOfFirstLeafByte+leafDataOffset>=offset && indexOfFirstLeafByte-offset+leafDataOffset <= count && indexOfFirstLeafByte-offset+leafDataOffset+leafDataSize <= count, "Writing to target out of bounds");
+    //TODO Simplify formula, make it easier to understand
+    leaf.node()->read(static_cast<uint8_t*>(target) + indexOfFirstLeafByte - offset + leafDataOffset, leafDataOffset, leafDataSize);
+  };
+  auto onCreateLeaf = [] (uint64_t /*beginByte*/, uint32_t /*count*/) -> Data {
+    ASSERT(false, "Reading shouldn't create new leaves.");
+  };
+
+  _traverseLeavesByByteIndices(offset, count, true, onExistingLeaf, onCreateLeaf);
+}
+
+void DataTree::writeBytes(const void *source, uint64_t offset, uint64_t count) {
+  unique_lock<shared_mutex> lock(_treeStructureMutex);
+
+  auto onExistingLeaf = [source, offset, count] (uint64_t indexOfFirstLeafByte, LeafHandle leaf, uint32_t leafDataOffset, uint32_t leafDataSize) {
+    ASSERT(indexOfFirstLeafByte+leafDataOffset>=offset && indexOfFirstLeafByte-offset+leafDataOffset <= count && indexOfFirstLeafByte-offset+leafDataOffset+leafDataSize <= count, "Reading from source out of bounds");
+    if (leafDataOffset == 0 && leafDataSize == leaf.nodeStore()->layout().maxBytesPerLeaf()) {
+      Data leafData(leafDataSize);
+      std::memcpy(leafData.data(), static_cast<const uint8_t*>(source) + indexOfFirstLeafByte - offset, leafDataSize);
+      leaf.nodeStore()->overwriteLeaf(leaf.blockId(), std::move(leafData));
+    } else {
+      //TODO Simplify formula, make it easier to understand
+      leaf.node()->write(static_cast<const uint8_t*>(source) + indexOfFirstLeafByte - offset + leafDataOffset, leafDataOffset,
+                         leafDataSize);
+    }
+  };
+  auto onCreateLeaf = [source, offset, count] (uint64_t beginByte, uint32_t numBytes) -> Data {
+    ASSERT(beginByte >= offset && beginByte-offset <= count && beginByte-offset+numBytes <= count, "Reading from source out of bounds");
+    Data result(numBytes);
+    //TODO Simplify formula, make it easier to understand
+    std::memcpy(result.data(), static_cast<const uint8_t*>(source) + beginByte - offset, numBytes);
+    return result;
+  };
+
+  _traverseLeavesByByteIndices(offset, count, false, onExistingLeaf, onCreateLeaf);
 }
 
 }

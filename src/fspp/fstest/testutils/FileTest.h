@@ -11,16 +11,16 @@ template<class ConcreteFileSystemTestFixture>
 class FileTest: public FileSystemTest<ConcreteFileSystemTestFixture> {
 public:
   FileTest(): file_root(), file_nested() {
-	this->LoadDir("/")->createAndOpenFile("myfile", this->MODE_PUBLIC, 0, 0);
-	file_root = cpputils::to_unique_ptr(this->LoadFile("/myfile"));
-	file_root_node = cpputils::to_unique_ptr(this->Load("/myfile"));
+	this->LoadDir("/")->createAndOpenFile("myfile", this->MODE_PUBLIC, fspp::uid_t(0), fspp::gid_t(0));
+	file_root = this->LoadFile("/myfile");
+	file_root_node = this->Load("/myfile");
 
-	this->LoadDir("/")->createDir("mydir", this->MODE_PUBLIC, 0, 0);
-	this->LoadDir("/mydir")->createAndOpenFile("mynestedfile", this->MODE_PUBLIC, 0, 0);
-	file_nested = cpputils::to_unique_ptr(this->LoadFile("/mydir/mynestedfile"));
-	file_nested_node = cpputils::to_unique_ptr(this->Load("/mydir/mynestedfile"));
+	this->LoadDir("/")->createDir("mydir", this->MODE_PUBLIC, fspp::uid_t(0), fspp::gid_t(0));
+	this->LoadDir("/mydir")->createAndOpenFile("mynestedfile", this->MODE_PUBLIC, fspp::uid_t(0), fspp::gid_t(0));
+	file_nested = this->LoadFile("/mydir/mynestedfile");
+	file_nested_node = this->Load("/mydir/mynestedfile");
 
-	this->LoadDir("/")->createDir("mydir2", this->MODE_PUBLIC, 0, 0);
+	this->LoadDir("/")->createDir("mydir2", this->MODE_PUBLIC, fspp::uid_t(0), fspp::gid_t(0));
   }
   std::unique_ptr<fspp::File> file_root;
   std::unique_ptr<fspp::File> file_nested;
@@ -28,39 +28,38 @@ public:
   std::unique_ptr<fspp::Node> file_nested_node;
 
   //TODO IN_STAT still needed after moving it to FsppNodeTest?
-  void IN_STAT(fspp::File *file, fspp::Node *node, std::function<void (struct stat)> callback) {
-	  struct stat st1, st2;
-	  node->stat(&st1);
+  void IN_STAT(fspp::File *file, fspp::Node *node, std::function<void (const fspp::Node::stat_info&)> callback) {
+	  auto st1 = node->stat();
 	  callback(st1);
-	  file->open(O_RDONLY)->stat(&st2);
+	  auto st2 = file->open(fspp::openflags_t::RDONLY())->stat();
 	  callback(st2);
   }
 
-  void EXPECT_SIZE(uint64_t expectedSize, fspp::File *file, fspp::Node *node) {
-	IN_STAT(file, node, [expectedSize] (struct stat st) {
-		EXPECT_EQ(expectedSize, (uint64_t)st.st_size);
+  void EXPECT_SIZE(fspp::num_bytes_t expectedSize, fspp::File *file, fspp::Node *node) {
+	IN_STAT(file, node, [expectedSize] (const fspp::Node::stat_info& st) {
+		EXPECT_EQ(expectedSize, st.size);
 	});
 
 	EXPECT_NUMBYTES_READABLE(expectedSize, file);
   }
 
-  void EXPECT_NUMBYTES_READABLE(uint64_t expectedSize, fspp::File *file) {
-	auto openFile = file->open(O_RDONLY);
-	cpputils::Data data(expectedSize);
+  void EXPECT_NUMBYTES_READABLE(fspp::num_bytes_t expectedSize, fspp::File *file) {
+	auto openFile = file->open(fspp::openflags_t::RDONLY());
+	cpputils::Data data(expectedSize.value());
 	//Try to read one byte more than the expected size
-	ssize_t readBytes = openFile->read(data.data(), expectedSize+1, 0);
+    fspp::num_bytes_t readBytes = openFile->read(data.data(), expectedSize+fspp::num_bytes_t(1), fspp::num_bytes_t(0));
 	//and check that it only read the expected size (but also not less)
-	EXPECT_EQ(expectedSize, (uint64_t)readBytes);
+	EXPECT_EQ(expectedSize, readBytes);
   }
 
-  void EXPECT_ATIME_EQ(struct timespec expected, struct stat st) {
-	  EXPECT_EQ(expected.tv_sec, st.st_atim.tv_sec);
-	  EXPECT_EQ(expected.tv_nsec, st.st_atim.tv_nsec);
+  void EXPECT_ATIME_EQ(struct timespec expected, const fspp::Node::stat_info& st) {
+	  EXPECT_EQ(expected.tv_sec, st.atime.tv_sec);
+	  EXPECT_EQ(expected.tv_nsec, st.atime.tv_nsec);
   }
 
-  void EXPECT_MTIME_EQ(struct timespec expected, struct stat st) {
-      EXPECT_EQ(expected.tv_sec, st.st_mtim.tv_sec);
-      EXPECT_EQ(expected.tv_nsec, st.st_mtim.tv_nsec);
+  void EXPECT_MTIME_EQ(struct timespec expected, const fspp::Node::stat_info& st) {
+      EXPECT_EQ(expected.tv_sec, st.mtime.tv_sec);
+      EXPECT_EQ(expected.tv_nsec, st.mtime.tv_nsec);
   }
 };
 

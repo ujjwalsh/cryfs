@@ -1,5 +1,7 @@
 #include "IOStreamConsole.h"
 #include <boost/algorithm/string/trim.hpp>
+#include "DontEchoStdinToStdoutRAII.h"
+#include <cpp-utils/assert/assert.h>
 
 using std::ostream;
 using std::istream;
@@ -91,8 +93,21 @@ bool IOStreamConsole::askYesNo(const string &question, bool /*defaultValue*/) {
     return _askForChoice("Your choice [y/n]: ", _parseYesNo());
 }
 
-void IOStreamConsole::print(const std::string &output) {
+void IOStreamConsole::print(const string &output) {
     _output << output << std::flush;
+}
+
+string IOStreamConsole::askPassword(const string &question) {
+    DontEchoStdinToStdoutRAII _stdin_input_is_hidden_as_long_as_this_is_in_scope;
+
+    _output << question << std::flush;
+    string result;
+    std::getline(_input, result);
+    _output << std::endl;
+
+    ASSERT(result.size() == 0 || result[result.size() - 1] != '\n', "Unexpected std::getline() behavior");
+
+    return result;
 }
 
 }

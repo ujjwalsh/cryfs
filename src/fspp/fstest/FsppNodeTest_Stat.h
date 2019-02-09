@@ -3,7 +3,7 @@
 #define MESSMER_FSPP_FSTEST_FSPPNODETEST_STAT_H_
 
 #include "testutils/FsppNodeTest.h"
-#include "../fuse/FuseErrnoException.h"
+#include "../fs_interface/FuseErrnoException.h"
 
 template<class ConcreteFileSystemTestFixture>
 class FsppNodeTest_Stat: public FsppNodeTest<ConcreteFileSystemTestFixture> {
@@ -11,8 +11,8 @@ public:
     void Test_Nlink() {
         this->CreateNode("/mynode");
         auto node = this->Load("/mynode");
-        this->IN_STAT(node.get(), [] (struct stat st) {
-            EXPECT_EQ(1u, st.st_nlink);
+        this->IN_STAT(node.get(), [] (const fspp::Node::stat_info& st) {
+            EXPECT_EQ(1u, st.nlink);
         });
     }
 };
@@ -26,14 +26,14 @@ TYPED_TEST_CASE_P(FsppNodeTest_Stat_FileOnly);
 TYPED_TEST_P(FsppNodeTest_Stat_FileOnly, CreatedFileIsEmpty) {
     this->CreateFile("/myfile");
     auto node = this->Load("/myfile");
-    this->EXPECT_SIZE(0, node.get());
+    this->EXPECT_SIZE(fspp::num_bytes_t(0), node.get());
 }
 
 TYPED_TEST_P(FsppNodeTest_Stat_FileOnly, FileIsFile) {
     this->CreateFile("/myfile");
     auto node = this->Load("/myfile");
-    this->IN_STAT(node.get(), [] (struct stat st) {
-        EXPECT_TRUE(S_ISREG(st.st_mode));
+    this->IN_STAT(node.get(), [] (const fspp::Node::stat_info& st) {
+        EXPECT_TRUE(st.mode.hasFileFlag());
     });
 }
 
@@ -46,8 +46,8 @@ TYPED_TEST_CASE_P(FsppNodeTest_Stat_DirOnly);
 TYPED_TEST_P(FsppNodeTest_Stat_DirOnly, DirIsDir) {
     this->CreateDir("/mydir");
     auto node = this->Load("/mydir");
-    this->IN_STAT(node.get(), [] (struct stat st) {
-        EXPECT_TRUE(S_ISDIR(st.st_mode));
+    this->IN_STAT(node.get(), [] (const fspp::Node::stat_info& st) {
+        EXPECT_TRUE(st.mode.hasDirFlag());
     });
 }
 
@@ -60,8 +60,8 @@ TYPED_TEST_CASE_P(FsppNodeTest_Stat_SymlinkOnly);
 TYPED_TEST_P(FsppNodeTest_Stat_SymlinkOnly, SymlinkIsSymlink) {
     this->CreateSymlink("/mysymlink");
     auto node = this->Load("/mysymlink");
-    this->IN_STAT(node.get(), [] (struct stat st) {
-        EXPECT_TRUE(S_ISLNK(st.st_mode));
+    this->IN_STAT(node.get(), [] (const fspp::Node::stat_info& st) {
+        EXPECT_TRUE(st.mode.hasSymlinkFlag());
     });
 }
 

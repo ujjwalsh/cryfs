@@ -1,5 +1,5 @@
 #include "testutils/FuseTruncateTest.h"
-#include "fspp/fuse/FuseErrnoException.h"
+#include "fspp/fs_interface/FuseErrnoException.h"
 
 using ::testing::_;
 using ::testing::StrEq;
@@ -15,9 +15,9 @@ INSTANTIATE_TEST_CASE_P(FuseTruncateErrorTest, FuseTruncateErrorTest, Values(EAC
 
 TEST_P(FuseTruncateErrorTest, ReturnedErrorIsCorrect) {
   ReturnIsFileOnLstat(FILENAME);
-  EXPECT_CALL(fsimpl, truncate(StrEq(FILENAME), _))
+  EXPECT_CALL(*fsimpl, truncate(StrEq(FILENAME), _))
     .Times(1).WillOnce(Throw(FuseErrnoException(GetParam())));
 
-  int error = TruncateFileReturnError(FILENAME, 0);
+  int error = TruncateFileReturnError(FILENAME, fspp::num_bytes_t(0));
   EXPECT_EQ(GetParam(), error);
 }
