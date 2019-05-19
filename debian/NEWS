@@ -1,0 +1,7 @@
+cryfs (0.10.0-1) unstable; urgency=medium
+
+  It is recommended that you make a backup of the data in your
+  encrypted volumes before installing this upgrade. It is also
+  a good idea to create new volumes from scratch after the upgrade.
+
+ -- David Steele <steele@debian.org>  Sun, 19 May 2019 08:39:06 -0400
