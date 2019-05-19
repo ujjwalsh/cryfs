@@ -20,7 +20,7 @@ Vcs-Git: https://github.com/davesteele/cryfs.git -b debian
 Homepage: https://www.cryfs.org/
 
 Package: cryfs
-Architecture: any
+Architecture: linux-any
 Depends: fuse,
          ${misc:Depends},
          ${shlibs:Depends}
