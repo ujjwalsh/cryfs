@@ -252,7 +252,11 @@ namespace cryfs_cli {
                 ASSERT(_device != none, "File system not ready to be initialized. Was it already initialized before?");
 
                 //TODO Test auto unmounting after idle timeout
-                _idleUnmounter = _createIdleCallback(options.unmountAfterIdleMinutes(), [fs] {fs->stop();});
+                const boost::optional<double> idle_minutes = options.unmountAfterIdleMinutes();
+                _idleUnmounter = _createIdleCallback(idle_minutes, [fs, idle_minutes] {
+                    LOG(INFO, "Unmounting because file system was idle for {} minutes", *idle_minutes);
+                    fs->stop();
+                });
                 if (_idleUnmounter != none) {
                     (*_device)->onFsAction(std::bind(&CallAfterTimeout::resetTimer, _idleUnmounter->get()));
                 }
@@ -395,7 +399,7 @@ namespace cryfs_cli {
         return false;
     }
 
-    int Cli::main(int argc, const char *argv[], unique_ref<HttpClient> httpClient, std::function<void()> onMounted) {
+    int Cli::main(int argc, const char **argv, unique_ref<HttpClient> httpClient, std::function<void()> onMounted) {
         cpputils::showBacktraceOnCrash();
         cpputils::set_thread_name("cryfs");
 
