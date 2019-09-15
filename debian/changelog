@@ -1,9 +1,9 @@
-cryfs (0.10.0-1) UNRELEASED; urgency=medium
+cryfs (0.10.2-1) unstable; urgency=medium
 
   * New upstream version.
     - Fixes file corruption with concurrent access.
 
- -- David Steele <steele@debian.org>  Sat, 09 Feb 2019 11:08:15 -0500
+ -- David Steele <steele@debian.org>  Sat, 14 Sep 2019 23:24:25 -0400
 
 cryfs (0.9.10-2) unstable; urgency=medium
 

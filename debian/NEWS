@@ -1,4 +1,4 @@
-cryfs (0.10.0-1) unstable; urgency=medium
+cryfs (0.10.2-1) unstable; urgency=medium
 
   It is recommended that you make a backup of the data in your
   encrypted volumes before installing this upgrade. It is also
