@@ -1,0 +1,307 @@
+--- a/src/gitversion/gitversion.cmake
++++ b/src/gitversion/gitversion.cmake
+@@ -1,7 +1,7 @@
+ set(DIR_OF_GITVERSION_TOOL "${CMAKE_CURRENT_LIST_DIR}" CACHE INTERNAL "DIR_OF_GITVERSION_TOOL")
+ 
+ function (get_git_version OUTPUT_VARIABLE)
+-    EXECUTE_PROCESS(COMMAND python ${DIR_OF_GITVERSION_TOOL}/getversion.py
++    EXECUTE_PROCESS(COMMAND python3 ${DIR_OF_GITVERSION_TOOL}/getversion.py
+         WORKING_DIRECTORY ${DIR_OF_GITVERSION_TOOL}
+         OUTPUT_VARIABLE VERSION
+         ERROR_VARIABLE error
+--- a/src/gitversion/getversion.py
++++ b/src/gitversion/getversion.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ 
+ import versioneer
+ 
+--- a/src/gitversion/setup.py
++++ b/src/gitversion/setup.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ 
+ from setuptools import setup
+ import versioneer
+--- a/vendor/googletest/gtest/googlemock/scripts/fuse_gmock_files.py
++++ b/vendor/googletest/gtest/googlemock/scripts/fuse_gmock_files.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2009, Google Inc.
+ # All rights reserved.
+--- a/vendor/googletest/gtest/googlemock/scripts/generator/cpp/ast.py
++++ b/vendor/googletest/gtest/googlemock/scripts/generator/cpp/ast.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2007 Neal Norwitz
+ # Portions Copyright 2007 Google Inc.
+--- a/vendor/googletest/gtest/googlemock/scripts/generator/cpp/gmock_class.py
++++ b/vendor/googletest/gtest/googlemock/scripts/generator/cpp/gmock_class.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2008 Google Inc.  All Rights Reserved.
+ #
+--- a/vendor/googletest/gtest/googlemock/scripts/generator/cpp/gmock_class_test.py
++++ b/vendor/googletest/gtest/googlemock/scripts/generator/cpp/gmock_class_test.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2009 Neal Norwitz All Rights Reserved.
+ # Portions Copyright 2009 Google Inc. All Rights Reserved.
+--- a/vendor/googletest/gtest/googlemock/scripts/generator/cpp/keywords.py
++++ b/vendor/googletest/gtest/googlemock/scripts/generator/cpp/keywords.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2007 Neal Norwitz
+ # Portions Copyright 2007 Google Inc.
+--- a/vendor/googletest/gtest/googlemock/scripts/generator/cpp/tokenize.py
++++ b/vendor/googletest/gtest/googlemock/scripts/generator/cpp/tokenize.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2007 Neal Norwitz
+ # Portions Copyright 2007 Google Inc.
+--- a/vendor/googletest/gtest/googlemock/scripts/generator/cpp/utils.py
++++ b/vendor/googletest/gtest/googlemock/scripts/generator/cpp/utils.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2007 Neal Norwitz
+ # Portions Copyright 2007 Google Inc.
+--- a/vendor/googletest/gtest/googlemock/scripts/generator/gmock_gen.py
++++ b/vendor/googletest/gtest/googlemock/scripts/generator/gmock_gen.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2008 Google Inc. All Rights Reserved.
+ #
+--- a/vendor/googletest/gtest/googlemock/scripts/gmock_doctor.py
++++ b/vendor/googletest/gtest/googlemock/scripts/gmock_doctor.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2008, Google Inc.
+ # All rights reserved.
+--- a/vendor/googletest/gtest/googlemock/scripts/upload.py
++++ b/vendor/googletest/gtest/googlemock/scripts/upload.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2007 Google Inc.
+ #
+--- a/vendor/googletest/gtest/googlemock/scripts/upload_gmock.py
++++ b/vendor/googletest/gtest/googlemock/scripts/upload_gmock.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2009, Google Inc.
+ # All rights reserved.
+--- a/vendor/googletest/gtest/googlemock/test/gmock_leak_test.py
++++ b/vendor/googletest/gtest/googlemock/test/gmock_leak_test.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2009, Google Inc.
+ # All rights reserved.
+--- a/vendor/googletest/gtest/googlemock/test/gmock_output_test.py
++++ b/vendor/googletest/gtest/googlemock/test/gmock_output_test.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2008, Google Inc.
+ # All rights reserved.
+--- a/vendor/googletest/gtest/googletest/scripts/fuse_gtest_files.py
++++ b/vendor/googletest/gtest/googletest/scripts/fuse_gtest_files.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2009, Google Inc.
+ # All rights reserved.
+--- a/vendor/googletest/gtest/googletest/scripts/gen_gtest_pred_impl.py
++++ b/vendor/googletest/gtest/googletest/scripts/gen_gtest_pred_impl.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2006, Google Inc.
+ # All rights reserved.
+--- a/vendor/googletest/gtest/googletest/scripts/pump.py
++++ b/vendor/googletest/gtest/googletest/scripts/pump.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2008, Google Inc.
+ # All rights reserved.
+--- a/vendor/googletest/gtest/googletest/scripts/release_docs.py
++++ b/vendor/googletest/gtest/googletest/scripts/release_docs.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2013 Google Inc. All Rights Reserved.
+ #
+--- a/vendor/googletest/gtest/googletest/scripts/upload.py
++++ b/vendor/googletest/gtest/googletest/scripts/upload.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2007 Google Inc.
+ #
+--- a/vendor/googletest/gtest/googletest/scripts/upload_gtest.py
++++ b/vendor/googletest/gtest/googletest/scripts/upload_gtest.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2009, Google Inc.
+ # All rights reserved.
+--- a/vendor/googletest/gtest/googletest/test/gtest_break_on_failure_unittest.py
++++ b/vendor/googletest/gtest/googletest/test/gtest_break_on_failure_unittest.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2006, Google Inc.
+ # All rights reserved.
+--- a/vendor/googletest/gtest/googletest/test/gtest_catch_exceptions_test.py
++++ b/vendor/googletest/gtest/googletest/test/gtest_catch_exceptions_test.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2010 Google Inc.  All Rights Reserved.
+ #
+--- a/vendor/googletest/gtest/googletest/test/gtest_color_test.py
++++ b/vendor/googletest/gtest/googletest/test/gtest_color_test.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2008, Google Inc.
+ # All rights reserved.
+--- a/vendor/googletest/gtest/googletest/test/gtest_env_var_test.py
++++ b/vendor/googletest/gtest/googletest/test/gtest_env_var_test.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2008, Google Inc.
+ # All rights reserved.
+--- a/vendor/googletest/gtest/googletest/test/gtest_filter_unittest.py
++++ b/vendor/googletest/gtest/googletest/test/gtest_filter_unittest.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2005 Google Inc. All Rights Reserved.
+ #
+--- a/vendor/googletest/gtest/googletest/test/gtest_help_test.py
++++ b/vendor/googletest/gtest/googletest/test/gtest_help_test.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2009, Google Inc.
+ # All rights reserved.
+--- a/vendor/googletest/gtest/googletest/test/gtest_json_outfiles_test.py
++++ b/vendor/googletest/gtest/googletest/test/gtest_json_outfiles_test.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ # Copyright 2018, Google Inc.
+ # All rights reserved.
+ #
+--- a/vendor/googletest/gtest/googletest/test/gtest_json_output_unittest.py
++++ b/vendor/googletest/gtest/googletest/test/gtest_json_output_unittest.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ # Copyright 2018, Google Inc.
+ # All rights reserved.
+ #
+--- a/vendor/googletest/gtest/googletest/test/gtest_list_tests_unittest.py
++++ b/vendor/googletest/gtest/googletest/test/gtest_list_tests_unittest.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2006, Google Inc.
+ # All rights reserved.
+--- a/vendor/googletest/gtest/googletest/test/gtest_output_test.py
++++ b/vendor/googletest/gtest/googletest/test/gtest_output_test.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2008, Google Inc.
+ # All rights reserved.
+--- a/vendor/googletest/gtest/googletest/test/gtest_shuffle_test.py
++++ b/vendor/googletest/gtest/googletest/test/gtest_shuffle_test.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2009 Google Inc. All Rights Reserved.
+ #
+--- a/vendor/googletest/gtest/googletest/test/gtest_throw_on_failure_test.py
++++ b/vendor/googletest/gtest/googletest/test/gtest_throw_on_failure_test.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2009, Google Inc.
+ # All rights reserved.
+--- a/vendor/googletest/gtest/googletest/test/gtest_uninitialized_test.py
++++ b/vendor/googletest/gtest/googletest/test/gtest_uninitialized_test.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2008, Google Inc.
+ # All rights reserved.
+--- a/vendor/googletest/gtest/googletest/test/gtest_xml_outfiles_test.py
++++ b/vendor/googletest/gtest/googletest/test/gtest_xml_outfiles_test.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2008, Google Inc.
+ # All rights reserved.
+--- a/vendor/googletest/gtest/googletest/test/gtest_xml_output_unittest.py
++++ b/vendor/googletest/gtest/googletest/test/gtest_xml_output_unittest.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2006, Google Inc.
+ # All rights reserved.
+--- a/vendor/googletest/gtest/googletest/xcode/Scripts/versiongenerate.py
++++ b/vendor/googletest/gtest/googletest/xcode/Scripts/versiongenerate.py
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python3
+ #
+ # Copyright 2008, Google Inc.
+ # All rights reserved.

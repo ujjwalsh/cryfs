@@ -13,7 +13,7 @@ Build-Depends: debhelper (>= 10),
                libcrypto++-dev (>= 5.6.4),
                libssl-dev,
                libfuse-dev,
-               python-all,
+               python3-all,
 Standards-Version: 4.1.2
 Vcs-Browser: https://github.com/davesteele/cryfs
 Vcs-Git: https://github.com/davesteele/cryfs.git -b debian
